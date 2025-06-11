@@ -55,6 +55,39 @@ export class GeminiService {
     return !!apiKey && apiKey !== 'your_gemini_api_key_here' && apiKey.length > 10
   }
 
+  private cleanJsonResponse(text: string): string {
+    // Remove markdown code blocks if present
+    let cleaned = text.trim()
+    
+    // Remove ```json and ``` markers
+    if (cleaned.startsWith('```json')) {
+      cleaned = cleaned.replace(/^```json\s*/, '')
+    }
+    if (cleaned.startsWith('```')) {
+      cleaned = cleaned.replace(/^```\s*/, '')
+    }
+    if (cleaned.endsWith('```')) {
+      cleaned = cleaned.replace(/\s*```$/, '')
+    }
+    
+    // Find the first [ or { and last ] or }
+    const firstBracket = Math.min(
+      cleaned.indexOf('[') === -1 ? Infinity : cleaned.indexOf('['),
+      cleaned.indexOf('{') === -1 ? Infinity : cleaned.indexOf('{')
+    )
+    
+    const lastBracket = Math.max(
+      cleaned.lastIndexOf(']'),
+      cleaned.lastIndexOf('}')
+    )
+    
+    if (firstBracket !== Infinity && lastBracket !== -1) {
+      cleaned = cleaned.substring(firstBracket, lastBracket + 1)
+    }
+    
+    return cleaned.trim()
+  }
+
   async generateStudyBuddyResponse(
     message: string, 
     persona: StudyBuddyPersona, 
@@ -123,7 +156,7 @@ Generate a brief, personalized welcome message for a student${userName ? ` named
     }
 
     try {
-      const prompt = `Generate ${questionCount} quiz questions about ${subject} with the following specifications:
+      const prompt = `Generate exactly ${questionCount} quiz questions about ${subject} with the following specifications:
       
       - Difficulty: ${difficulty === 'mixed' ? 'mix of easy, medium, and hard' : difficulty}
       - Question types: ${questionTypes.join(', ')}
@@ -131,38 +164,73 @@ Generate a brief, personalized welcome message for a student${userName ? ` named
       
       Each question should have:
       * A clear, well-formed question
-      * For multiple choice: 4 options with one correct answer
-      * For true/false: a statement that can be clearly true or false
-      * For fill-blank: a sentence with one blank to fill
-      * For short-answer: a question requiring a brief response
+      * For multiple choice: exactly 4 options with one correct answer (use index 0-3 for correctAnswer)
+      * For true/false: a statement that can be clearly true or false (use "true" or "false" for correctAnswer)
+      * For fill-blank: a sentence with one blank to fill (use the exact answer text for correctAnswer)
+      * For short-answer: a question requiring a brief response (use the exact answer text for correctAnswer)
       * An explanation of the correct answer
       * A difficulty level (easy/medium/hard)
       * A specific topic within ${subject}
       * Point value (easy: 1, medium: 2, hard: 3)
       
-      Format as JSON array with this structure:
+      Return ONLY a valid JSON array with this exact structure:
       [
         {
-          "id": "unique_id",
-          "type": "multiple-choice|true-false|fill-blank|short-answer",
-          "question": "Question text",
+          "id": "q1",
+          "type": "multiple-choice",
+          "question": "Question text here?",
           "options": ["option1", "option2", "option3", "option4"],
-          "correctAnswer": "correct answer or option index",
-          "explanation": "Why this is correct",
-          "difficulty": "easy|medium|hard",
+          "correctAnswer": 0,
+          "explanation": "Explanation of why this is correct",
+          "difficulty": "easy",
           "topic": "specific topic",
-          "points": 1-3
+          "points": 1
         }
-      ]`
+      ]
+      
+      Do not include any markdown formatting, explanatory text, or code blocks. Return only the JSON array.`
 
       const result = await this.model.generateContent(prompt)
       const response = await result.response
       const text = response.text()
       
+      console.log('Raw Gemini response:', text)
+      
       try {
-        return JSON.parse(text)
+        // Clean the response to extract JSON
+        const cleanedText = this.cleanJsonResponse(text)
+        console.log('Cleaned JSON text:', cleanedText)
+        
+        const parsed = JSON.parse(cleanedText)
+        
+        // Validate that we got an array
+        if (!Array.isArray(parsed)) {
+          throw new Error('Response is not an array')
+        }
+        
+        // Validate each question has required fields
+        const validatedQuestions = parsed.map((q: any, index: number) => {
+          if (!q.question || !q.type) {
+            throw new Error(`Question ${index + 1} is missing required fields`)
+          }
+          
+          return {
+            id: q.id || `q${index + 1}`,
+            type: q.type,
+            question: q.question,
+            options: q.options || [],
+            correctAnswer: q.correctAnswer,
+            explanation: q.explanation || 'No explanation provided.',
+            difficulty: q.difficulty || 'medium',
+            topic: q.topic || subject,
+            points: q.points || (q.difficulty === 'easy' ? 1 : q.difficulty === 'medium' ? 2 : 3)
+          }
+        })
+        
+        return validatedQuestions
       } catch (parseError) {
         console.error('Error parsing quiz JSON:', parseError)
+        console.error('Failed to parse text:', text)
         throw new Error('Failed to generate properly formatted quiz questions')
       }
     } catch (error: any) {
@@ -206,22 +274,24 @@ Generate a brief, personalized welcome message for a student${userName ? ` named
       
       Text: ${text.substring(0, 3000)}...
       
-      Please format your response as JSON with the following structure:
+      Return ONLY a valid JSON object with the following structure:
       {
         "summary": "Brief summary here",
         "keyTopics": ["topic1", "topic2", "topic3"],
-        "difficulty": "Beginner|Intermediate|Advanced",
+        "difficulty": "Beginner",
         "estimatedReadTime": "X minutes",
         "suggestedQuestions": ["question1", "question2", "question3"]
       }
-      `
+      
+      Do not include any markdown formatting or explanatory text.`
 
       const result = await this.model.generateContent(prompt)
       const response = await result.response
       const text_response = response.text()
 
       try {
-        return JSON.parse(text_response)
+        const cleanedText = this.cleanJsonResponse(text_response)
+        return JSON.parse(cleanedText)
       } catch (parseError) {
         // Fallback parsing if AI doesn't return valid JSON
         return {
@@ -249,27 +319,29 @@ Generate a brief, personalized welcome message for a student${userName ? ` named
 
     try {
       const prompt = `
-      Create ${count} flashcards based on the following text. Each flashcard should have a clear question on the front and a concise answer on the back.
+      Create exactly ${count} flashcards based on the following text. Each flashcard should have a clear question on the front and a concise answer on the back.
       
       Text: ${text.substring(0, 2000)}...
       
-      Format as JSON array:
+      Return ONLY a valid JSON array:
       [
         {
-          "id": "unique_id",
+          "id": "card1",
           "front": "Question or term",
           "back": "Answer or definition",
           "category": "topic category"
         }
       ]
-      `
+      
+      Do not include any markdown formatting or explanatory text.`
 
       const result = await this.model.generateContent(prompt)
       const response = await result.response
       const text_response = response.text()
 
       try {
-        return JSON.parse(text_response)
+        const cleanedText = this.cleanJsonResponse(text_response)
+        return JSON.parse(cleanedText)
       } catch (parseError) {
         throw new Error('Failed to generate properly formatted flashcards')
       }
