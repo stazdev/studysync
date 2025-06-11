@@ -42,7 +42,7 @@ function App() {
                       </ProtectedRoute>
                     }
                   >
-                    <Route index element={<Navigate to="/dashboard" replace />} />
+                    <Route index element={<Navigate to="/dashboard\" replace />} />
                     <Route path="dashboard" element={<DashboardPage />} />
                     <Route path="upload" element={<UploadPage />} />
                     <Route path="groups" element={<StudyGroupsPage />} />
@@ -72,7 +72,7 @@ function App() {
                   />
                   
                   {/* Catch all */}
-                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="*" element={<Navigate to="/dashboard\" replace />} />
                 </Routes>
               </Router>
             </PreferencesProvider>
