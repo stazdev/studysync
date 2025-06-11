@@ -68,10 +68,10 @@ export const GroupDetails: React.FC<GroupDetailsProps> = ({
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
-      case 'Beginner': return 'bg-green-100 text-green-700 border-green-200'
-      case 'Intermediate': return 'bg-yellow-100 text-yellow-700 border-yellow-200'
-      case 'Advanced': return 'bg-red-100 text-red-700 border-red-200'
-      default: return 'bg-gray-100 text-gray-700 border-gray-200'
+      case 'Beginner': return 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800'
+      case 'Intermediate': return 'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800'
+      case 'Advanced': return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800'
+      default: return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600'
     }
   }
 
@@ -116,7 +116,7 @@ export const GroupDetails: React.FC<GroupDetailsProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="relative bg-gradient-to-r from-primary-600 to-secondary-600 text-white p-6">
           <button
@@ -177,32 +177,32 @@ export const GroupDetails: React.FC<GroupDetailsProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex space-x-3 mt-6">
+          <div className="flex flex-wrap gap-3 mt-6">
             {group.isJoined ? (
               <>
                 <Button 
-                  className="bg-white text-primary-600 hover:bg-gray-100"
+                  className="bg-white text-primary-600 hover:bg-gray-100 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
                   onClick={handleOpenChat}
                 >
                   <MessageSquare className="w-4 h-4 mr-2" />
                   Chat
                 </Button>
                 <Button 
-                  className="bg-white/20 hover:bg-white/30 text-white border border-white/30"
+                  className="bg-white/20 hover:bg-white/30 text-white border border-white/30 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
                   onClick={handleJoinSession}
                 >
                   <Video className="w-4 h-4 mr-2" />
                   Join Session
                 </Button>
                 {group.role === 'owner' && (
-                  <Button className="bg-white/20 hover:bg-white/30 text-white border border-white/30">
+                  <Button className="bg-white/20 hover:bg-white/30 text-white border border-white/30 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200">
                     <Settings className="w-4 h-4 mr-2" />
                     Manage
                   </Button>
                 )}
                 <Button
                   onClick={onLeave}
-                  className="bg-red-500 hover:bg-red-600 text-white"
+                  className="bg-red-500 hover:bg-red-600 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
                 >
                   Leave Group
                 </Button>
@@ -210,7 +210,7 @@ export const GroupDetails: React.FC<GroupDetailsProps> = ({
             ) : (
               <Button
                 onClick={onJoin}
-                className="bg-white text-primary-600 hover:bg-gray-100"
+                className="bg-white text-primary-600 hover:bg-gray-100 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
                 disabled={group.memberCount >= group.maxMembers}
               >
                 <UserPlus className="w-4 h-4 mr-2" />
@@ -221,7 +221,7 @@ export const GroupDetails: React.FC<GroupDetailsProps> = ({
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-gray-200">
+        <div className="border-b border-gray-200 dark:border-gray-700">
           <div className="flex space-x-8 px-6">
             {[
               { id: 'overview', label: 'Overview', icon: BookOpen },
@@ -237,8 +237,8 @@ export const GroupDetails: React.FC<GroupDetailsProps> = ({
                   className={`
                     flex items-center space-x-2 py-4 border-b-2 transition-colors
                     ${activeTab === tab.id
-                      ? 'border-primary-600 text-primary-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                      ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                     }
                   `}
                 >
@@ -256,12 +256,12 @@ export const GroupDetails: React.FC<GroupDetailsProps> = ({
             <div className="space-y-6">
               {/* Tags */}
               <div>
-                <h3 className="font-semibold text-gray-900 mb-3">Tags</h3>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Tags</h3>
                 <div className="flex flex-wrap gap-2">
                   {group.tags.map((tag, index) => (
                     <span
                       key={index}
-                      className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm"
+                      className="px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full text-sm"
                     >
                       {tag}
                     </span>
@@ -272,12 +272,12 @@ export const GroupDetails: React.FC<GroupDetailsProps> = ({
               {/* Next Session */}
               {group.nextSession && (
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-3">Next Session</h3>
-                  <div className="bg-gradient-to-r from-primary-50 to-secondary-50 rounded-lg p-4">
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Next Session</h3>
+                  <div className="bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 rounded-lg p-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="font-medium text-gray-900">{group.nextSession.topic}</h4>
-                        <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
+                        <h4 className="font-medium text-gray-900 dark:text-white">{group.nextSession.topic}</h4>
+                        <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400 mt-1">
                           <div className="flex items-center space-x-1">
                             <Calendar className="w-4 h-4" />
                             <span>{group.nextSession.date}</span>
@@ -299,23 +299,23 @@ export const GroupDetails: React.FC<GroupDetailsProps> = ({
 
               {/* Group Info */}
               <div>
-                <h3 className="font-semibold text-gray-900 mb-3">Group Information</h3>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Group Information</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-gray-600">Created by:</span>
-                    <span className="ml-2 font-medium">{group.createdBy}</span>
+                    <span className="text-gray-600 dark:text-gray-400">Created by:</span>
+                    <span className="ml-2 font-medium dark:text-white">{group.createdBy}</span>
                   </div>
                   <div>
-                    <span className="text-gray-600">Created:</span>
-                    <span className="ml-2 font-medium">{new Date(group.createdAt).toLocaleDateString()}</span>
+                    <span className="text-gray-600 dark:text-gray-400">Created:</span>
+                    <span className="ml-2 font-medium dark:text-white">{new Date(group.createdAt).toLocaleDateString()}</span>
                   </div>
                   <div>
-                    <span className="text-gray-600">Last activity:</span>
-                    <span className="ml-2 font-medium">{group.lastActivity}</span>
+                    <span className="text-gray-600 dark:text-gray-400">Last activity:</span>
+                    <span className="ml-2 font-medium dark:text-white">{group.lastActivity}</span>
                   </div>
                   <div>
-                    <span className="text-gray-600">Member limit:</span>
-                    <span className="ml-2 font-medium">{group.maxMembers}</span>
+                    <span className="text-gray-600 dark:text-gray-400">Member limit:</span>
+                    <span className="ml-2 font-medium dark:text-white">{group.maxMembers}</span>
                   </div>
                 </div>
               </div>
@@ -325,26 +325,26 @@ export const GroupDetails: React.FC<GroupDetailsProps> = ({
           {activeTab === 'members' && (
             <div className="space-y-4">
               {mockMembers.map((member) => (
-                <div key={member.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div key={member.id} className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-lg">
+                    <div className="w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-lg">
                       {member.avatar}
                     </div>
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className="font-medium text-gray-900">{member.name}</span>
+                        <span className="font-medium text-gray-900 dark:text-white">{member.name}</span>
                         {member.role === 'owner' && <Crown className="w-4 h-4 text-yellow-500" />}
                         {member.role === 'moderator' && <Shield className="w-4 h-4 text-blue-500" />}
                       </div>
-                      <div className="text-sm text-gray-600">
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
                         Joined {new Date(member.joinedAt).toLocaleDateString()} • {member.contributions} contributions
                       </div>
                     </div>
                   </div>
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    member.role === 'owner' ? 'bg-yellow-100 text-yellow-700' :
-                    member.role === 'moderator' ? 'bg-blue-100 text-blue-700' :
-                    'bg-gray-100 text-gray-700'
+                    member.role === 'owner' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                    member.role === 'moderator' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
+                    'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
                   }`}>
                     {member.role}
                   </span>
@@ -356,10 +356,10 @@ export const GroupDetails: React.FC<GroupDetailsProps> = ({
           {activeTab === 'sessions' && (
             <div className="space-y-4">
               {mockSessions.map((session) => (
-                <div key={session.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div key={session.id} className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
                   <div>
-                    <h4 className="font-medium text-gray-900">{session.title}</h4>
-                    <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
+                    <h4 className="font-medium text-gray-900 dark:text-white">{session.title}</h4>
+                    <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400 mt-1">
                       <span>{session.date}</span>
                       <span>•</span>
                       <span>{session.time}</span>
@@ -369,9 +369,9 @@ export const GroupDetails: React.FC<GroupDetailsProps> = ({
                   </div>
                   <div className="flex items-center space-x-3">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      session.status === 'upcoming' ? 'bg-blue-100 text-blue-700' :
-                      session.status === 'live' ? 'bg-red-100 text-red-700' :
-                      'bg-gray-100 text-gray-700'
+                      session.status === 'upcoming' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
+                      session.status === 'live' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                      'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
                     }`}>
                       {session.status}
                     </span>
@@ -389,16 +389,16 @@ export const GroupDetails: React.FC<GroupDetailsProps> = ({
           {activeTab === 'materials' && (
             <div className="space-y-4">
               {mockMaterials.map((material) => (
-                <div key={material.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div key={material.id} className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <div className="w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
                       {material.type === 'pdf' && <BookOpen className="w-5 h-5 text-red-600" />}
                       {material.type === 'quiz' && <Zap className="w-5 h-5 text-yellow-600" />}
                       {material.type === 'document' && <Target className="w-5 h-5 text-blue-600" />}
                     </div>
                     <div>
-                      <h4 className="font-medium text-gray-900">{material.title}</h4>
-                      <div className="text-sm text-gray-600">
+                      <h4 className="font-medium text-gray-900 dark:text-white">{material.title}</h4>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
                         By {material.uploadedBy} • {new Date(material.uploadedAt).toLocaleDateString()}
                       </div>
                     </div>
