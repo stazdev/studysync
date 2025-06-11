@@ -116,23 +116,42 @@ export const PreferencesProvider: React.FC<PreferencesProviderProps> = ({ childr
     setTheme(preferences.theme)
   }, [preferences.theme, setTheme])
 
+  const createDefaultPreferences = async () => {
+    if (!user) return null
+
+    try {
+      const { data, error: insertError } = await supabase
+        .from('user_preferences')
+        .insert({
+          user_id: user.id,
+          preferences: defaultPreferences,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select('preferences')
+        .single()
+
+      if (insertError) throw insertError
+      return data
+    } catch (err) {
+      console.error('Error creating default preferences:', err)
+      return null
+    }
+  }
+
   const fetchPreferences = async () => {
     if (!user) return
 
     try {
-      // First, try to create the table if it doesn't exist (fallback)
+      // First, try to fetch existing preferences
       const { data, error: fetchError } = await supabase
         .from('user_preferences')
         .select('preferences')
         .eq('user_id', user.id)
-        .single()
+        .maybeSingle() // Use maybeSingle to handle no results gracefully
 
       if (fetchError) {
-        if (fetchError.code === 'PGRST116') {
-          // No data found, use defaults
-          console.log('No preferences found, using defaults')
-          setTheme('light')
-        } else if (fetchError.code === '42P01') {
+        if (fetchError.code === '42P01') {
           // Table doesn't exist
           console.log('User preferences table does not exist. Please run the database migration.')
           error('Database setup required', 'Please contact support to set up your preferences')
@@ -141,16 +160,29 @@ export const PreferencesProvider: React.FC<PreferencesProviderProps> = ({ childr
           throw fetchError
         }
       } else if (data?.preferences) {
+        // Preferences found, merge with defaults
         const mergedPrefs = { ...defaultPreferences, ...data.preferences }
         setPreferences(mergedPrefs)
         setTheme(mergedPrefs.theme)
       } else {
-        // Set default theme if no preferences found
-        setTheme('light')
+        // No preferences found, create default ones
+        console.log('No preferences found, creating defaults')
+        const newData = await createDefaultPreferences()
+        
+        if (newData?.preferences) {
+          const mergedPrefs = { ...defaultPreferences, ...newData.preferences }
+          setPreferences(mergedPrefs)
+          setTheme(mergedPrefs.theme)
+        } else {
+          // Fallback to defaults if creation failed
+          setPreferences(defaultPreferences)
+          setTheme('light')
+        }
       }
     } catch (err) {
       console.error('Error fetching preferences:', err)
       error('Failed to load preferences', 'Using default settings')
+      setPreferences(defaultPreferences)
       setTheme('light')
     } finally {
       setLoading(false)

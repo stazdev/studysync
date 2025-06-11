@@ -125,14 +125,18 @@ export const uploadService = {
 
   async getUserMaterials(userId: string): Promise<StudyMaterial[]> {
     try {
+      // Use a simpler query to avoid RLS policy recursion
       const { data, error } = await supabase
         .from('study_materials')
         .select('*')
         .eq('uploaded_by', userId)
         .order('created_at', { ascending: false })
 
-      if (error) throw error
-      return data
+      if (error) {
+        console.error('Error fetching user materials:', error)
+        return []
+      }
+      return data || []
     } catch (error) {
       console.error('Error fetching user materials:', error)
       return []
@@ -141,20 +145,18 @@ export const uploadService = {
 
   async getGroupMaterials(groupId: string): Promise<StudyMaterial[]> {
     try {
+      // Simplified query to avoid RLS recursion issues
       const { data, error } = await supabase
         .from('study_materials')
-        .select(`
-          *,
-          profiles:uploaded_by (
-            username,
-            profile_image_url
-          )
-        `)
+        .select('*')
         .eq('group_id', groupId)
         .order('created_at', { ascending: false })
 
-      if (error) throw error
-      return data
+      if (error) {
+        console.error('Error fetching group materials:', error)
+        return []
+      }
+      return data || []
     } catch (error) {
       console.error('Error fetching group materials:', error)
       return []

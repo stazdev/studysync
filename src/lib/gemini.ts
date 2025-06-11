@@ -1,6 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || '')
+// Check if API key is available
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY
+const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null
 
 export interface StudyBuddyPersona {
   id: string
@@ -47,13 +49,21 @@ export const studyBuddyPersonas: StudyBuddyPersona[] = [
 ]
 
 export class GeminiService {
-  private model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+  private model = genAI ? genAI.getGenerativeModel({ model: 'gemini-1.5-flash' }) : null
+
+  private isApiKeyConfigured(): boolean {
+    return !!apiKey && apiKey !== 'your_gemini_api_key_here'
+  }
 
   async generateStudyBuddyResponse(
     message: string, 
     persona: StudyBuddyPersona, 
     context?: string
   ): Promise<string> {
+    if (!this.isApiKeyConfigured() || !this.model) {
+      return `Hi! I'm ${persona.name} ${persona.avatar}. I'd love to help you study, but it looks like the AI service isn't configured yet. You can still explore the other features of StudySync!`
+    }
+
     try {
       const prompt = `${persona.systemPrompt}
 
@@ -68,11 +78,15 @@ Respond as ${persona.name} in character. Keep responses conversational, helpful,
       return response.text()
     } catch (error) {
       console.error('Error generating AI response:', error)
-      return `I'm having trouble connecting right now, but I'm here to help! Try asking me again in a moment.`
+      return `I'm having trouble connecting right now, but I'm here to help! Try asking me again in a moment. ${persona.avatar}`
     }
   }
 
   async generateWelcomeMessage(persona: StudyBuddyPersona, userName?: string): Promise<string> {
+    if (!this.isApiKeyConfigured() || !this.model) {
+      return `Welcome back${userName ? `, ${userName}` : ''}! I'm ${persona.name} ${persona.avatar}, and I'm excited to help you on your learning journey today! 🌟`
+    }
+
     try {
       const prompt = `${persona.systemPrompt}
 
@@ -83,7 +97,7 @@ Generate a brief, personalized welcome message for a student${userName ? ` named
       return response.text()
     } catch (error) {
       console.error('Error generating welcome message:', error)
-      return `Welcome back! I'm ${persona.name}, and I'm excited to help you on your learning journey today! 🌟`
+      return `Welcome back${userName ? `, ${userName}` : ''}! I'm ${persona.name} ${persona.avatar}, and I'm excited to help you on your learning journey today! 🌟`
     }
   }
 }

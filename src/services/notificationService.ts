@@ -13,8 +13,11 @@ export const notificationService = {
         .order('created_at', { ascending: false })
         .limit(50)
 
-      if (error) throw error
-      return data
+      if (error) {
+        console.error('Error fetching notifications:', error)
+        return []
+      }
+      return data || []
     } catch (error) {
       console.error('Error fetching notifications:', error)
       return []
@@ -28,7 +31,10 @@ export const notificationService = {
         .select('*', { count: 'exact', head: true })
         .eq('is_read', false)
 
-      if (error) throw error
+      if (error) {
+        console.error('Error fetching unread count:', error)
+        return 0
+      }
       return count || 0
     } catch (error) {
       console.error('Error fetching unread count:', error)
@@ -38,9 +44,14 @@ export const notificationService = {
 
   async markAsRead(notificationId: string): Promise<void> {
     try {
-      const { error } = await supabase.rpc('mark_notification_read', {
-        notification_id: notificationId
-      })
+      const { error } = await supabase
+        .from('notifications')
+        .update({ 
+          is_read: true, 
+          read_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', notificationId)
 
       if (error) throw error
     } catch (error) {
@@ -51,7 +62,15 @@ export const notificationService = {
 
   async markAllAsRead(): Promise<void> {
     try {
-      const { error } = await supabase.rpc('mark_all_notifications_read')
+      const { error } = await supabase
+        .from('notifications')
+        .update({ 
+          is_read: true, 
+          read_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('is_read', false)
+
       if (error) throw error
     } catch (error) {
       console.error('Error marking all notifications as read:', error)
@@ -84,19 +103,24 @@ export const notificationService = {
     metadata: any = {}
   ): Promise<string> {
     try {
-      const { data, error } = await supabase.rpc('create_notification', {
-        target_user_id: userId,
-        notification_title: title,
-        notification_message: message,
-        notification_type: type,
-        notification_priority: priority,
-        notification_action_url: actionUrl,
-        notification_action_label: actionLabel,
-        notification_metadata: metadata
-      })
+      const { data, error } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: userId,
+          title,
+          message,
+          type,
+          priority,
+          action_url: actionUrl,
+          action_label: actionLabel,
+          metadata,
+          created_at: new Date().toISOString()
+        })
+        .select('id')
+        .single()
 
       if (error) throw error
-      return data
+      return data.id
     } catch (error) {
       console.error('Error creating notification:', error)
       throw error
