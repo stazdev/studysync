@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabase'
+import { useProfile } from '../contexts/ProfileContext'
 import { PersonaSelector } from '../components/profile/PersonaSelector'
+import { ProfileImageUpload } from '../components/profile/ProfileImageUpload'
 import { StudyBuddyAvatar } from '../components/study-buddy/StudyBuddyAvatar'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
+import { Avatar } from '../components/ui/Avatar'
 import { 
   User, 
   Settings, 
@@ -36,9 +38,9 @@ import { useToast } from '../contexts/ToastContext'
 
 export const ProfilePage: React.FC = () => {
   const { user } = useAuth()
+  const { profile, updateProfile } = useProfile()
   const { success, error } = useToast()
-  const [profile, setProfile] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'stats' | 'achievements'>('profile')
   const [username, setUsername] = useState('')
@@ -49,51 +51,14 @@ export const ProfilePage: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false)
 
   useEffect(() => {
-    fetchProfile()
-  }, [user])
-
-  const fetchProfile = async () => {
-    if (!user) return
-
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching profile:', error)
-        // Don't throw error, just use defaults
-      }
-
-      if (data) {
-        setProfile(data)
-        setUsername(data.username || '')
-        setFullName(data.full_name || '')
-        setBio(data.bio || '')
-        setLocation(data.location || '')
-        setSelectedPersona(data.study_buddy_persona || 'professor-synapse')
-      } else {
-        // Use defaults if no profile found
-        setUsername(user.user_metadata?.username || '')
-        setFullName('')
-        setBio('')
-        setLocation('')
-        setSelectedPersona('professor-synapse')
-      }
-    } catch (error) {
-      console.error('Error fetching profile:', error)
-      // Use defaults on error
-      setUsername(user.user_metadata?.username || '')
-      setFullName('')
-      setBio('')
-      setLocation('')
-      setSelectedPersona('professor-synapse')
-    } finally {
-      setLoading(false)
+    if (profile) {
+      setUsername(profile.username || '')
+      setFullName(profile.full_name || '')
+      setBio(profile.bio || '')
+      setLocation(profile.location || '')
+      setSelectedPersona(profile.study_buddy_persona || 'professor-synapse')
     }
-  }
+  }, [profile])
 
   const handlePersonaSelect = async (persona: StudyBuddyPersona) => {
     setSelectedPersona(persona.id)
@@ -105,22 +70,8 @@ export const ProfilePage: React.FC = () => {
 
     setSaving(true)
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user.id,
-          username: username || user.user_metadata?.username || '',
-          email: user.email || '',
-          study_buddy_persona: personaId,
-          updated_at: new Date().toISOString()
-        })
-
-      if (error) {
-        console.error('Error saving persona preference:', error)
-        error('Failed to save preference', 'Please try again')
-      } else {
-        success('AI Buddy updated!', `Selected ${studyBuddyPersonas.find(p => p.id === personaId)?.name}`)
-      }
+      await updateProfile({ study_buddy_persona: personaId })
+      success('AI Buddy updated!', `Selected ${studyBuddyPersonas.find(p => p.id === personaId)?.name}`)
     } catch (error) {
       console.error('Error saving persona preference:', error)
       error('Failed to save preference', 'Please try again')
@@ -134,27 +85,16 @@ export const ProfilePage: React.FC = () => {
 
     setSaving(true)
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user.id,
-          username: username || user.user_metadata?.username || '',
-          email: user.email || '',
-          full_name: fullName,
-          bio,
-          location,
-          study_buddy_persona: selectedPersona,
-          updated_at: new Date().toISOString()
-        })
-
-      if (error) {
-        console.error('Error saving profile:', error)
-        error('Failed to save profile', 'Please try again')
-      } else {
-        await fetchProfile()
-        setIsEditing(false)
-        success('Profile saved!', 'Your profile has been updated')
-      }
+      await updateProfile({
+        username,
+        full_name: fullName,
+        bio,
+        location,
+        study_buddy_persona: selectedPersona
+      })
+      
+      setIsEditing(false)
+      success('Profile saved!', 'Your profile has been updated')
     } catch (error) {
       console.error('Error saving profile:', error)
       error('Failed to save profile', 'Please try again')
@@ -163,7 +103,13 @@ export const ProfilePage: React.FC = () => {
     }
   }
 
-  if (loading) {
+  const handleImageUpdate = (imageUrl: string) => {
+    // The ProfileImageUpload component handles the database update
+    // This callback is for any additional UI updates if needed
+    success('Profile image updated!', 'Your new profile picture is now visible')
+  }
+
+  if (!profile) {
     return (
       <div className="flex items-center justify-center min-h-96">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
@@ -203,6 +149,9 @@ export const ProfilePage: React.FC = () => {
     { type: 'session', description: 'Attended live study session', time: '3 days ago' }
   ]
 
+  const userDisplayName = profile.full_name || profile.username || 'User'
+  const userInitials = userDisplayName[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'
+
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Header */}
@@ -212,25 +161,24 @@ export const ProfilePage: React.FC = () => {
           <div className="flex items-start justify-between">
             <div className="flex items-center space-x-6">
               <div className="relative">
-                <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center text-4xl font-bold">
-                  {username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
-                </div>
-                <button className="absolute -bottom-2 -right-2 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow">
-                  <Camera className="w-4 h-4 text-gray-600" />
-                </button>
+                <ProfileImageUpload
+                  currentImageUrl={profile.profile_image_url}
+                  onImageUpdate={handleImageUpdate}
+                  size="xl"
+                />
               </div>
               <div>
-                <h1 className="text-3xl font-bold mb-2">{fullName || username || 'User'}</h1>
-                <p className="text-primary-100 mb-2">@{username}</p>
+                <h1 className="text-3xl font-bold mb-2">{userDisplayName}</h1>
+                <p className="text-primary-100 mb-2">@{profile.username}</p>
                 <div className="flex items-center space-x-4 text-primary-100">
                   <div className="flex items-center space-x-1">
                     <Mail className="w-4 h-4" />
                     <span className="text-sm">{user?.email}</span>
                   </div>
-                  {location && (
+                  {profile.location && (
                     <div className="flex items-center space-x-1">
                       <MapPin className="w-4 h-4" />
-                      <span className="text-sm">{location}</span>
+                      <span className="text-sm">{profile.location}</span>
                     </div>
                   )}
                   <div className="flex items-center space-x-1">
@@ -238,8 +186,8 @@ export const ProfilePage: React.FC = () => {
                     <span className="text-sm">Joined {new Date(user?.created_at || '').toLocaleDateString()}</span>
                   </div>
                 </div>
-                {bio && (
-                  <p className="text-primary-100 mt-3 max-w-md">{bio}</p>
+                {profile.bio && (
+                  <p className="text-primary-100 mt-3 max-w-md">{profile.bio}</p>
                 )}
               </div>
             </div>
@@ -296,10 +244,7 @@ export const ProfilePage: React.FC = () => {
           return (
             <button
               key={tab.id}
-              onClick={() => {
-                console.log('Switching to tab:', tab.id) // Debug log
-                setActiveTab(tab.id as any)
-              }}
+              onClick={() => setActiveTab(tab.id as any)}
               className={`
                 flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-md transition-all duration-200
                 ${activeTab === tab.id
@@ -317,11 +262,6 @@ export const ProfilePage: React.FC = () => {
 
       {/* Tab Content */}
       <div className="min-h-[400px]">
-        {/* Debug info */}
-        <div className="mb-4 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-sm text-blue-800 dark:text-blue-200">
-          Current active tab: <strong>{activeTab}</strong>
-        </div>
-
         {activeTab === 'profile' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Profile Information */}

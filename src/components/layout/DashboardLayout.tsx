@@ -1,6 +1,8 @@
 import React from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import { useProfile } from '../../contexts/ProfileContext'
+import { Avatar } from '../ui/Avatar'
 import { 
   GraduationCap, 
   Home, 
@@ -55,6 +57,7 @@ export const DashboardLayout: React.FC = () => {
   const [showAllNotifications, setShowAllNotifications] = React.useState(false)
   const [notifications, setNotifications] = React.useState<Notification[]>([])
   const { user, signOut } = useAuth()
+  const { profile } = useProfile()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -247,6 +250,11 @@ export const DashboardLayout: React.FC = () => {
   const unreadCount = notifications.filter(n => n.unread).length
   const displayNotifications = showAllNotifications ? notifications : notifications.slice(0, 5)
 
+  // Get user display info
+  const userDisplayName = profile?.full_name || profile?.username || user?.user_metadata?.username || 'User'
+  const userInitials = userDisplayName[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'
+  const userProfileImage = profile?.profile_image_url
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Sidebar - Starts from top, positioned first */}
@@ -334,14 +342,15 @@ export const DashboardLayout: React.FC = () => {
           {/* User Profile Section */}
           <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
             <div className="flex items-center mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary-600 to-secondary-600 rounded-full flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-sm">
-                  {user?.user_metadata?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
-                </span>
-              </div>
+              <Avatar
+                src={userProfileImage}
+                fallback={userInitials}
+                size="md"
+                className="shadow-lg"
+              />
               <div className="ml-3 flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                  {user?.user_metadata?.username || 'User'}
+                  {userDisplayName}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
               </div>
@@ -566,11 +575,12 @@ export const DashboardLayout: React.FC = () => {
                 onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
                 className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
-                <div className="w-8 h-8 bg-gradient-to-br from-primary-600 to-secondary-600 rounded-full flex items-center justify-center shadow-sm">
-                  <span className="text-white font-medium text-sm">
-                    {user?.user_metadata?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
-                  </span>
-                </div>
+                <Avatar
+                  src={userProfileImage}
+                  fallback={userInitials}
+                  size="sm"
+                  className="shadow-sm"
+                />
                 <ChevronDown className={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform ${
                   profileDropdownOpen ? 'rotate-180' : ''
                 }`} />
@@ -581,14 +591,15 @@ export const DashboardLayout: React.FC = () => {
                   {/* User Info */}
                   <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-primary-600 to-secondary-600 rounded-full flex items-center justify-center shadow-sm">
-                        <span className="text-white font-medium">
-                          {user?.user_metadata?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
-                        </span>
-                      </div>
+                      <Avatar
+                        src={userProfileImage}
+                        fallback={userInitials}
+                        size="md"
+                        className="shadow-sm"
+                      />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                          {user?.user_metadata?.username || 'User'}
+                          {userDisplayName}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
                       </div>
