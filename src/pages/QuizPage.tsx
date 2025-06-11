@@ -138,90 +138,85 @@ export const QuizPage: React.FC = () => {
   const generateQuiz = async () => {
     setLoading(true)
     try {
-      const prompt = `Generate ${quizSettings.questionCount} quiz questions about ${quizSettings.subject} with the following specifications:
+      info('Generating quiz...', 'AI is creating personalized questions for you')
       
-      - Difficulty: ${quizSettings.difficulty === 'mixed' ? 'mix of easy, medium, and hard' : quizSettings.difficulty}
-      - Question types: ${quizSettings.questionTypes.join(', ')}
-      - Each question should have:
-        * A clear, well-formed question
-        * For multiple choice: 4 options with one correct answer
-        * For true/false: a statement that can be clearly true or false
-        * For fill-blank: a sentence with one blank to fill
-        * For short-answer: a question requiring a brief response
-        * An explanation of the correct answer
-        * A difficulty level (easy/medium/hard)
-        * A specific topic within ${quizSettings.subject}
-        * Point value (easy: 1, medium: 2, hard: 3)
-      
-      Format as JSON array with this structure:
-      [
-        {
-          "id": "unique_id",
-          "type": "multiple-choice|true-false|fill-blank|short-answer",
-          "question": "Question text",
-          "options": ["option1", "option2", "option3", "option4"] (for multiple choice only),
-          "correctAnswer": "correct answer or option index",
-          "explanation": "Why this is correct",
-          "difficulty": "easy|medium|hard",
-          "topic": "specific topic",
-          "points": 1-3
-        }
-      ]`
-
-      const response = await geminiService.generateStudyBuddyResponse(
-        prompt,
-        {
-          id: 'professor-synapse',
-          name: 'Professor Synapse',
-          description: 'Quiz generator',
-          avatar: '👨‍🏫',
-          personality: 'Academic and precise',
-          systemPrompt: 'You are an expert quiz generator. Create high-quality, educational quiz questions that test understanding and knowledge effectively.'
-        }
+      // Use Gemini to generate quiz questions
+      const generatedQuestions = await geminiService.generateQuizQuestions(
+        quizSettings.subject,
+        quizSettings.difficulty,
+        quizSettings.questionCount,
+        quizSettings.questionTypes
       )
 
-      try {
-        const generatedQuestions = JSON.parse(response)
-        const processedQuestions = generatedQuestions.map((q: any, index: number) => ({
-          ...q,
-          id: q.id || `q_${index + 1}`,
-          points: q.points || (q.difficulty === 'easy' ? 1 : q.difficulty === 'medium' ? 2 : 3)
-        }))
+      // Process and validate the questions
+      const processedQuestions = generatedQuestions.map((q: any, index: number) => ({
+        id: q.id || `q_${index + 1}`,
+        type: q.type || 'multiple-choice',
+        question: q.question,
+        options: q.options || [],
+        correctAnswer: q.correctAnswer,
+        explanation: q.explanation || 'No explanation provided.',
+        difficulty: q.difficulty || 'medium',
+        topic: q.topic || quizSettings.subject,
+        points: q.points || (q.difficulty === 'easy' ? 1 : q.difficulty === 'medium' ? 2 : 3)
+      }))
 
-        if (quizSettings.randomOrder) {
-          processedQuestions.sort(() => Math.random() - 0.5)
-        }
-
-        setQuestions(processedQuestions)
-        setQuizState('taking')
-        setQuizStartTime(new Date())
-        setQuestionStartTime(new Date())
-        setTimeRemaining(quizSettings.timeLimit * 60)
-        setCurrentQuestionIndex(0)
-        setUserAnswers(new Map())
-        
-        success('Quiz generated!', `${processedQuestions.length} questions ready`)
-      } catch (parseError) {
-        console.error('Error parsing AI response:', parseError)
-        // Fallback with sample questions
-        const fallbackQuestions = generateFallbackQuestions()
-        setQuestions(fallbackQuestions)
-        setQuizState('taking')
-        setQuizStartTime(new Date())
-        setQuestionStartTime(new Date())
-        setTimeRemaining(quizSettings.timeLimit * 60)
-        info('Using sample questions', 'AI generation failed, using sample quiz')
+      // Validate that we have questions
+      if (!processedQuestions || processedQuestions.length === 0) {
+        throw new Error('No questions were generated')
       }
-    } catch (err) {
+
+      // Randomize order if requested
+      if (quizSettings.randomOrder) {
+        processedQuestions.sort(() => Math.random() - 0.5)
+      }
+
+      setQuestions(processedQuestions)
+      setQuizState('taking')
+      setQuizStartTime(new Date())
+      setQuestionStartTime(new Date())
+      
+      // Set timer if time limit is specified
+      if (quizSettings.timeLimit > 0) {
+        setTimeRemaining(quizSettings.timeLimit * 60)
+      }
+      
+      setCurrentQuestionIndex(0)
+      setUserAnswers(new Map())
+      
+      success('Quiz generated!', `${processedQuestions.length} AI-generated questions ready`)
+      
+    } catch (err: any) {
       console.error('Error generating quiz:', err)
-      error('Failed to generate quiz', 'Please try again')
+      
+      // Show specific error messages
+      if (err.message?.includes('API key')) {
+        error('AI Service Unavailable', 'Please configure your Gemini API key to generate quizzes')
+      } else if (err.message?.includes('quota')) {
+        error('Service Temporarily Unavailable', 'AI quota exceeded. Please try again later.')
+      } else {
+        error('Quiz Generation Failed', 'Unable to generate quiz questions. Please try again.')
+      }
+      
+      // Fallback to sample questions for demo
+      const fallbackQuestions = generateFallbackQuestions()
+      setQuestions(fallbackQuestions)
+      setQuizState('taking')
+      setQuizStartTime(new Date())
+      setQuestionStartTime(new Date())
+      
+      if (quizSettings.timeLimit > 0) {
+        setTimeRemaining(quizSettings.timeLimit * 60)
+      }
+      
+      info('Using sample questions', 'Demo quiz loaded while AI service is unavailable')
     } finally {
       setLoading(false)
     }
   }
 
   const generateFallbackQuestions = (): Question[] => {
-    return [
+    const fallbackQuestions: Question[] = [
       {
         id: 'q1',
         type: 'multiple-choice',
@@ -242,8 +237,42 @@ export const QuizPage: React.FC = () => {
         difficulty: 'easy',
         topic: 'Algebra',
         points: 1
+      },
+      {
+        id: 'q3',
+        type: 'multiple-choice',
+        question: 'What is the integral of 2x?',
+        options: ['x²', 'x² + C', '2', '2x + C'],
+        correctAnswer: 1,
+        explanation: 'The integral of 2x is x² + C, where C is the constant of integration',
+        difficulty: 'medium',
+        topic: 'Calculus',
+        points: 2
+      },
+      {
+        id: 'q4',
+        type: 'fill-blank',
+        question: 'The quadratic formula is x = (-b ± √(b² - 4ac)) / ___',
+        correctAnswer: '2a',
+        explanation: 'The quadratic formula denominator is 2a',
+        difficulty: 'medium',
+        topic: 'Algebra',
+        points: 2
+      },
+      {
+        id: 'q5',
+        type: 'short-answer',
+        question: 'What is the limit of (sin x)/x as x approaches 0?',
+        correctAnswer: '1',
+        explanation: 'This is a fundamental limit in calculus: lim(x→0) (sin x)/x = 1',
+        difficulty: 'hard',
+        topic: 'Calculus',
+        points: 3
       }
     ]
+
+    // Return only the requested number of questions
+    return fallbackQuestions.slice(0, Math.min(quizSettings.questionCount, fallbackQuestions.length))
   }
 
   const handleAnswerSelect = (answer: string | number) => {
@@ -357,8 +386,8 @@ export const QuizPage: React.FC = () => {
               <Brain className="w-8 h-8" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold">Take Quiz</h1>
-              <p className="text-primary-100">Test your knowledge with AI-generated questions</p>
+              <h1 className="text-3xl font-bold">AI-Powered Quiz</h1>
+              <p className="text-primary-100">Test your knowledge with AI-generated questions tailored to your level</p>
             </div>
           </div>
         </div>
@@ -489,6 +518,20 @@ export const QuizPage: React.FC = () => {
                 </label>
               </div>
 
+              {/* AI Info */}
+              <div className="bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <Brain className="w-5 h-5 text-primary-600 dark:text-primary-400 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium text-primary-900 dark:text-primary-200">AI-Generated Questions</h4>
+                    <p className="text-primary-700 dark:text-primary-300 text-sm mt-1">
+                      Questions will be generated using advanced AI based on your selected subject and difficulty level. 
+                      Each quiz is unique and tailored to provide an optimal learning experience.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Quiz Preview */}
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                 <h4 className="font-medium text-gray-900 dark:text-white mb-3">Quiz Preview</h4>
@@ -511,6 +554,10 @@ export const QuizPage: React.FC = () => {
                     <span>Difficulty:</span>
                     <span className="font-medium capitalize">{quizSettings.difficulty}</span>
                   </div>
+                  <div className="flex justify-between">
+                    <span>Question Types:</span>
+                    <span className="font-medium">{quizSettings.questionTypes.length}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -524,8 +571,8 @@ export const QuizPage: React.FC = () => {
               className="px-8"
               disabled={quizSettings.questionTypes.length === 0}
             >
-              <Play className="w-5 h-5 mr-2" />
-              Generate & Start Quiz
+              <Zap className="w-5 h-5 mr-2" />
+              {loading ? 'Generating AI Quiz...' : 'Generate & Start Quiz'}
             </Button>
           </div>
         </div>
