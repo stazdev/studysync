@@ -17,17 +17,149 @@ import {
   Search,
   Plus,
   MessageSquare,
-  Brain
+  Brain,
+  Clock,
+  Calendar,
+  Award,
+  AlertCircle,
+  CheckCircle,
+  Info,
+  UserPlus,
+  BookOpen,
+  Video,
+  Zap,
+  Target,
+  TrendingUp,
+  Eye,
+  MoreHorizontal
 } from 'lucide-react'
 import { Button } from '../ui/Button'
+
+interface Notification {
+  id: string
+  title: string
+  message: string
+  time: string
+  unread: boolean
+  type: 'info' | 'success' | 'warning' | 'error' | 'quiz' | 'group' | 'session' | 'achievement'
+  actionUrl?: string
+  actionLabel?: string
+  avatar?: string
+  priority: 'low' | 'medium' | 'high'
+}
 
 export const DashboardLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = React.useState(false)
   const [profileDropdownOpen, setProfileDropdownOpen] = React.useState(false)
   const [notificationDropdownOpen, setNotificationDropdownOpen] = React.useState(false)
+  const [showAllNotifications, setShowAllNotifications] = React.useState(false)
+  const [notifications, setNotifications] = React.useState<Notification[]>([])
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+
+  // Initialize notifications
+  React.useEffect(() => {
+    const mockNotifications: Notification[] = [
+      {
+        id: '1',
+        title: 'New quiz available',
+        message: 'Biology Chapter 5 quiz is ready for you to take. Test your knowledge on cellular respiration and photosynthesis.',
+        time: '2 min ago',
+        unread: true,
+        type: 'quiz',
+        actionUrl: '/quiz',
+        actionLabel: 'Take Quiz',
+        avatar: '🧬',
+        priority: 'high'
+      },
+      {
+        id: '2',
+        title: 'Study group invitation',
+        message: 'You were invited to join "Advanced Math Study Group" by Dr. Sarah Chen. The group focuses on calculus and linear algebra.',
+        time: '1 hour ago',
+        unread: true,
+        type: 'group',
+        actionUrl: '/groups',
+        actionLabel: 'View Invitation',
+        avatar: '👩‍🏫',
+        priority: 'high'
+      },
+      {
+        id: '3',
+        title: 'Study reminder',
+        message: 'Time to review your Chemistry notes. You have a quiz scheduled for tomorrow on organic compounds.',
+        time: '3 hours ago',
+        unread: false,
+        type: 'info',
+        actionUrl: '/upload',
+        actionLabel: 'Review Notes',
+        avatar: '⏰',
+        priority: 'medium'
+      },
+      {
+        id: '4',
+        title: 'Achievement unlocked!',
+        message: 'Congratulations! You\'ve earned the "Study Streak" badge for studying 7 days in a row.',
+        time: '5 hours ago',
+        unread: false,
+        type: 'achievement',
+        actionUrl: '/profile',
+        actionLabel: 'View Achievements',
+        avatar: '🏆',
+        priority: 'low'
+      },
+      {
+        id: '5',
+        title: 'Live session starting',
+        message: 'The "Advanced Calculus Study Session" will begin in 15 minutes. Join now to secure your spot.',
+        time: '6 hours ago',
+        unread: false,
+        type: 'session',
+        actionUrl: '/groups',
+        actionLabel: 'Join Session',
+        avatar: '📹',
+        priority: 'high'
+      },
+      {
+        id: '6',
+        title: 'Quiz results available',
+        message: 'Your Physics Quiz results are ready! You scored 92% - excellent work on electromagnetic fields.',
+        time: '1 day ago',
+        unread: false,
+        type: 'success',
+        actionUrl: '/quiz',
+        actionLabel: 'View Results',
+        avatar: '📊',
+        priority: 'medium'
+      },
+      {
+        id: '7',
+        title: 'New study material uploaded',
+        message: 'Alex Rodriguez shared "Integration Techniques Practice Problems" in your Calculus study group.',
+        time: '1 day ago',
+        unread: false,
+        type: 'info',
+        actionUrl: '/groups',
+        actionLabel: 'View Material',
+        avatar: '📚',
+        priority: 'low'
+      },
+      {
+        id: '8',
+        title: 'Weekly progress report',
+        message: 'Your weekly study report is ready. You completed 5 quizzes and studied for 12 hours this week.',
+        time: '2 days ago',
+        unread: false,
+        type: 'info',
+        actionUrl: '/profile',
+        actionLabel: 'View Report',
+        avatar: '📈',
+        priority: 'low'
+      }
+    ]
+    setNotifications(mockNotifications)
+  }, [])
 
   const handleSignOut = async () => {
     await signOut()
@@ -48,12 +180,6 @@ export const DashboardLayout: React.FC = () => {
     { name: 'Start Quiz', icon: Brain, action: () => navigate('/quiz') },
   ]
 
-  const notifications = [
-    { id: 1, title: 'New quiz available', message: 'Biology Chapter 5 quiz is ready', time: '2 min ago', unread: true },
-    { id: 2, title: 'Study group invitation', message: 'You were invited to Advanced Math group', time: '1 hour ago', unread: true },
-    { id: 3, title: 'Study reminder', message: 'Time to review Chemistry notes', time: '3 hours ago', unread: false },
-  ]
-
   // Close dropdowns when clicking outside
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -67,6 +193,59 @@ export const DashboardLayout: React.FC = () => {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  const markAsRead = (notificationId: string) => {
+    setNotifications(prev => prev.map(notification => 
+      notification.id === notificationId 
+        ? { ...notification, unread: false }
+        : notification
+    ))
+  }
+
+  const markAllAsRead = () => {
+    setNotifications(prev => prev.map(notification => ({ ...notification, unread: false })))
+  }
+
+  const deleteNotification = (notificationId: string) => {
+    setNotifications(prev => prev.filter(notification => notification.id !== notificationId))
+  }
+
+  const handleNotificationAction = (notification: Notification) => {
+    if (notification.actionUrl) {
+      navigate(notification.actionUrl)
+      markAsRead(notification.id)
+      setNotificationDropdownOpen(false)
+    }
+  }
+
+  const getNotificationIcon = (type: Notification['type']) => {
+    switch (type) {
+      case 'quiz': return Target
+      case 'group': return Users
+      case 'session': return Video
+      case 'achievement': return Award
+      case 'success': return CheckCircle
+      case 'warning': return AlertCircle
+      case 'error': return AlertCircle
+      default: return Info
+    }
+  }
+
+  const getNotificationColor = (type: Notification['type']) => {
+    switch (type) {
+      case 'quiz': return 'text-blue-600 dark:text-blue-400'
+      case 'group': return 'text-purple-600 dark:text-purple-400'
+      case 'session': return 'text-green-600 dark:text-green-400'
+      case 'achievement': return 'text-yellow-600 dark:text-yellow-400'
+      case 'success': return 'text-green-600 dark:text-green-400'
+      case 'warning': return 'text-orange-600 dark:text-orange-400'
+      case 'error': return 'text-red-600 dark:text-red-400'
+      default: return 'text-blue-600 dark:text-blue-400'
+    }
+  }
+
+  const unreadCount = notifications.filter(n => n.unread).length
+  const displayNotifications = showAllNotifications ? notifications : notifications.slice(0, 5)
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -243,42 +422,140 @@ export const DashboardLayout: React.FC = () => {
                 className="relative p-2 rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
                 <Bell className="w-6 h-6" />
-                {notifications.some(n => n.unread) && (
-                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                {unreadCount > 0 && (
+                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                    <span className="text-xs text-white font-medium">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  </div>
                 )}
               </button>
 
               {notificationDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-2 animate-slide-up">
-                  <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Notifications</h3>
-                  </div>
-                  <div className="max-h-80 overflow-y-auto">
-                    {notifications.map((notification) => (
-                      <div
-                        key={notification.id}
-                        className={`px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer ${
-                          notification.unread ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-                        }`}
+                <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-2 animate-slide-up max-h-[80vh] overflow-hidden flex flex-col">
+                  {/* Header */}
+                  <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Notifications</h3>
+                    <div className="flex items-center space-x-2">
+                      {unreadCount > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={markAllAsRead}
+                          className="text-xs"
+                        >
+                          Mark all read
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setNotificationDropdownOpen(false)}
                       >
-                        <div className="flex items-start space-x-3">
-                          <div className={`w-2 h-2 rounded-full mt-2 ${
-                            notification.unread ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
-                          }`}></div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">{notification.title}</p>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 truncate">{notification.message}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">{notification.time}</p>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Notifications List */}
+                  <div className="flex-1 overflow-y-auto">
+                    {displayNotifications.length > 0 ? (
+                      displayNotifications.map((notification) => {
+                        const Icon = getNotificationIcon(notification.type)
+                        return (
+                          <div
+                            key={notification.id}
+                            className={`px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer border-l-4 ${
+                              notification.unread 
+                                ? 'bg-blue-50 dark:bg-blue-900/20 border-l-blue-500' 
+                                : 'border-l-transparent'
+                            }`}
+                            onClick={() => handleNotificationAction(notification)}
+                          >
+                            <div className="flex items-start space-x-3">
+                              <div className="flex-shrink-0">
+                                {notification.avatar ? (
+                                  <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-lg">
+                                    {notification.avatar}
+                                  </div>
+                                ) : (
+                                  <div className={`w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center ${getNotificationColor(notification.type)}`}>
+                                    <Icon className="w-5 h-5" />
+                                  </div>
+                                )}
+                                {notification.unread && (
+                                  <div className="w-3 h-3 bg-blue-500 rounded-full -mt-1 ml-7"></div>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-1">
+                                  <p className={`text-sm font-medium ${
+                                    notification.unread 
+                                      ? 'text-gray-900 dark:text-white' 
+                                      : 'text-gray-700 dark:text-gray-300'
+                                  }`}>
+                                    {notification.title}
+                                  </p>
+                                  <div className="flex items-center space-x-1">
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                      {notification.time}
+                                    </span>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        deleteNotification(notification.id)
+                                      }}
+                                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-auto"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mb-2">
+                                  {notification.message}
+                                </p>
+                                {notification.actionLabel && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-xs h-7"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleNotificationAction(notification)
+                                    }}
+                                  >
+                                    {notification.actionLabel}
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        )
+                      })
+                    ) : (
+                      <div className="px-4 py-8 text-center">
+                        <Bell className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                        <p className="text-gray-500 dark:text-gray-400">No notifications yet</p>
                       </div>
-                    ))}
+                    )}
                   </div>
-                  <div className="px-4 py-2 border-t border-gray-100 dark:border-gray-700">
-                    <button className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium">
-                      View all notifications
-                    </button>
-                  </div>
+
+                  {/* Footer */}
+                  {notifications.length > 5 && (
+                    <div className="px-4 py-2 border-t border-gray-100 dark:border-gray-700">
+                      <Button
+                        variant="ghost"
+                        className="w-full text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
+                        onClick={() => {
+                          setShowAllNotifications(!showAllNotifications)
+                        }}
+                      >
+                        {showAllNotifications ? 'Show less' : `View all ${notifications.length} notifications`}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
