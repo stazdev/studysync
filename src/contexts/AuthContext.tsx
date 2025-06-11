@@ -63,21 +63,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     if (error) throw error
 
-    // Create profile
-    if (data.user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([
-          {
-            id: data.user.id,
-            username,
-            email,
-          },
-        ])
-
-      if (profileError) throw profileError
-    }
-
+    // Profile will be created automatically via database trigger
     return data
   }
 

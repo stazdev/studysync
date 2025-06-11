@@ -2,6 +2,8 @@ import React from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useProfile } from '../../contexts/ProfileContext'
+import { notificationService } from '../../services/notificationService'
+import { statsService } from '../../services/statsService'
 import { Avatar } from '../ui/Avatar'
 import { 
   GraduationCap, 
@@ -56,113 +58,94 @@ export const DashboardLayout: React.FC = () => {
   const [notificationDropdownOpen, setNotificationDropdownOpen] = React.useState(false)
   const [showAllNotifications, setShowAllNotifications] = React.useState(false)
   const [notifications, setNotifications] = React.useState<Notification[]>([])
+  const [unreadCount, setUnreadCount] = React.useState(0)
+  const [userStats, setUserStats] = React.useState<any>({})
   const { user, signOut } = useAuth()
   const { profile } = useProfile()
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Initialize notifications
+  // Load notifications and stats
   React.useEffect(() => {
-    const mockNotifications: Notification[] = [
-      {
-        id: '1',
-        title: 'New quiz available',
-        message: 'Biology Chapter 5 quiz is ready for you to take. Test your knowledge on cellular respiration and photosynthesis.',
-        time: '2 min ago',
-        unread: true,
-        type: 'quiz',
-        actionUrl: '/quiz',
-        actionLabel: 'Take Quiz',
-        avatar: '🧬',
-        priority: 'high'
-      },
-      {
-        id: '2',
-        title: 'Study group invitation',
-        message: 'You were invited to join "Advanced Math Study Group" by Dr. Sarah Chen. The group focuses on calculus and linear algebra.',
-        time: '1 hour ago',
-        unread: true,
-        type: 'group',
-        actionUrl: '/groups',
-        actionLabel: 'View Invitation',
-        avatar: '👩‍🏫',
-        priority: 'high'
-      },
-      {
-        id: '3',
-        title: 'Study reminder',
-        message: 'Time to review your Chemistry notes. You have a quiz scheduled for tomorrow on organic compounds.',
-        time: '3 hours ago',
-        unread: false,
-        type: 'info',
-        actionUrl: '/upload',
-        actionLabel: 'Review Notes',
-        avatar: '⏰',
-        priority: 'medium'
-      },
-      {
-        id: '4',
-        title: 'Achievement unlocked!',
-        message: 'Congratulations! You\'ve earned the "Study Streak" badge for studying 7 days in a row.',
-        time: '5 hours ago',
-        unread: false,
-        type: 'achievement',
-        actionUrl: '/profile',
-        actionLabel: 'View Achievements',
-        avatar: '🏆',
-        priority: 'low'
-      },
-      {
-        id: '5',
-        title: 'Live session starting',
-        message: 'The "Advanced Calculus Study Session" will begin in 15 minutes. Join now to secure your spot.',
-        time: '6 hours ago',
-        unread: false,
-        type: 'session',
-        actionUrl: '/groups',
-        actionLabel: 'Join Session',
-        avatar: '📹',
-        priority: 'high'
-      },
-      {
-        id: '6',
-        title: 'Quiz results available',
-        message: 'Your Physics Quiz results are ready! You scored 92% - excellent work on electromagnetic fields.',
-        time: '1 day ago',
-        unread: false,
-        type: 'success',
-        actionUrl: '/quiz',
-        actionLabel: 'View Results',
-        avatar: '📊',
-        priority: 'medium'
-      },
-      {
-        id: '7',
-        title: 'New study material uploaded',
-        message: 'Alex Rodriguez shared "Integration Techniques Practice Problems" in your Calculus study group.',
-        time: '1 day ago',
-        unread: false,
-        type: 'info',
-        actionUrl: '/groups',
-        actionLabel: 'View Material',
-        avatar: '📚',
-        priority: 'low'
-      },
-      {
-        id: '8',
-        title: 'Weekly progress report',
-        message: 'Your weekly study report is ready. You completed 5 quizzes and studied for 12 hours this week.',
-        time: '2 days ago',
-        unread: false,
-        type: 'info',
-        actionUrl: '/profile',
-        actionLabel: 'View Report',
-        avatar: '📈',
-        priority: 'low'
+    if (user) {
+      loadNotifications()
+      loadUserStats()
+      
+      // Subscribe to real-time notifications
+      const subscription = notificationService.subscribeToNotifications((notification) => {
+        setNotifications(prev => [notification, ...prev])
+        setUnreadCount(prev => prev + 1)
+      })
+
+      return () => {
+        notificationService.unsubscribeFromNotifications(subscription)
       }
-    ]
-    setNotifications(mockNotifications)
-  }, [])
+    }
+  }, [user])
+
+  const loadNotifications = async () => {
+    try {
+      const [notificationsData, unreadCountData] = await Promise.all([
+        notificationService.getNotifications(),
+        notificationService.getUnreadCount()
+      ])
+
+      // Transform database notifications to UI format
+      const transformedNotifications = notificationsData.map(notification => ({
+        id: notification.id,
+        title: notification.title,
+        message: notification.message,
+        time: formatTimeAgo(new Date(notification.created_at)),
+        unread: !notification.is_read,
+        type: notification.type as any,
+        actionUrl: notification.action_url || undefined,
+        actionLabel: notification.action_label || undefined,
+        avatar: getNotificationAvatar(notification.type),
+        priority: notification.priority as any
+      }))
+
+      setNotifications(transformedNotifications)
+      setUnreadCount(unreadCountData)
+    } catch (error) {
+      console.error('Error loading notifications:', error)
+    }
+  }
+
+  const loadUserStats = async () => {
+    try {
+      const stats = await statsService.getUserStats()
+      setUserStats(stats)
+    } catch (error) {
+      console.error('Error loading user stats:', error)
+    }
+  }
+
+  const formatTimeAgo = (date: Date) => {
+    const now = new Date()
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
+    
+    if (diffInMinutes < 1) return 'just now'
+    if (diffInMinutes < 60) return `${diffInMinutes} min ago`
+    
+    const diffInHours = Math.floor(diffInMinutes / 60)
+    if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`
+    
+    const diffInDays = Math.floor(diffInHours / 24)
+    return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`
+  }
+
+  const getNotificationAvatar = (type: string) => {
+    switch (type) {
+      case 'quiz': return '🧬'
+      case 'group': return '👩‍🏫'
+      case 'session': return '📹'
+      case 'achievement': return '🏆'
+      case 'success': return '✅'
+      case 'warning': return '⚠️'
+      case 'error': return '❌'
+      default: return '📢'
+    }
+  }
 
   const handleSignOut = async () => {
     await signOut()
@@ -197,20 +180,43 @@ export const DashboardLayout: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const markAsRead = (notificationId: string) => {
-    setNotifications(prev => prev.map(notification => 
-      notification.id === notificationId 
-        ? { ...notification, unread: false }
-        : notification
-    ))
+  const markAsRead = async (notificationId: string) => {
+    try {
+      await notificationService.markAsRead(notificationId)
+      setNotifications(prev => prev.map(notification => 
+        notification.id === notificationId 
+          ? { ...notification, unread: false }
+          : notification
+      ))
+      setUnreadCount(prev => Math.max(0, prev - 1))
+    } catch (error) {
+      console.error('Error marking notification as read:', error)
+    }
   }
 
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(notification => ({ ...notification, unread: false })))
+  const markAllAsRead = async () => {
+    try {
+      await notificationService.markAllAsRead()
+      setNotifications(prev => prev.map(notification => ({ ...notification, unread: false })))
+      setUnreadCount(0)
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error)
+    }
   }
 
-  const deleteNotification = (notificationId: string) => {
-    setNotifications(prev => prev.filter(notification => notification.id !== notificationId))
+  const deleteNotification = async (notificationId: string) => {
+    try {
+      await notificationService.deleteNotification(notificationId)
+      setNotifications(prev => prev.filter(notification => notification.id !== notificationId))
+      
+      // Update unread count if the deleted notification was unread
+      const deletedNotification = notifications.find(n => n.id === notificationId)
+      if (deletedNotification?.unread) {
+        setUnreadCount(prev => Math.max(0, prev - 1))
+      }
+    } catch (error) {
+      console.error('Error deleting notification:', error)
+    }
   }
 
   const handleNotificationAction = (notification: Notification) => {
@@ -247,7 +253,6 @@ export const DashboardLayout: React.FC = () => {
     }
   }
 
-  const unreadCount = notifications.filter(n => n.unread).length
   const displayNotifications = showAllNotifications ? notifications : notifications.slice(0, 5)
 
   // Get user display info

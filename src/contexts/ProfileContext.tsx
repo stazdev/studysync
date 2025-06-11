@@ -1,19 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { useAuth } from './AuthContext'
 import { supabase } from '../lib/supabase'
+import type { Database } from '../lib/supabase'
 
-interface ProfileData {
-  id: string
-  username: string
-  email: string
-  full_name?: string
-  bio?: string
-  location?: string
-  profile_image_url?: string
-  study_buddy_persona?: string
-  created_at: string
-  updated_at: string
-}
+type ProfileData = Database['public']['Tables']['profiles']['Row']
 
 interface ProfileContextType {
   profile: ProfileData | null
@@ -62,55 +52,36 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
         .eq('id', user.id)
         .single()
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching profile:', error)
-        // Create default profile if none exists
-        await createDefaultProfile()
-      } else if (data) {
-        setProfile(data)
-      } else {
-        // No profile found, create one
-        await createDefaultProfile()
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // Profile doesn't exist, it should be created by trigger
+          console.log('Profile not found, waiting for creation...')
+          // Retry after a short delay
+          setTimeout(fetchProfile, 1000)
+          return
+        }
+        throw error
       }
+
+      setProfile(data)
     } catch (error) {
-      console.error('Error in fetchProfile:', error)
-      // Create default profile on error
-      await createDefaultProfile()
+      console.error('Error fetching profile:', error)
+      
+      // Create a fallback profile if needed
+      if (user) {
+        const fallbackProfile: Partial<ProfileData> = {
+          id: user.id,
+          username: user.user_metadata?.username || user.email?.split('@')[0] || 'user',
+          email: user.email || '',
+          full_name: user.user_metadata?.full_name || '',
+          study_buddy_persona: 'professor-synapse',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+        setProfile(fallbackProfile as ProfileData)
+      }
     } finally {
       setLoading(false)
-    }
-  }
-
-  const createDefaultProfile = async () => {
-    if (!user) return
-
-    const defaultProfile: Partial<ProfileData> = {
-      id: user.id,
-      username: user.user_metadata?.username || user.email?.split('@')[0] || 'user',
-      email: user.email || '',
-      full_name: user.user_metadata?.full_name || '',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .upsert(defaultProfile)
-        .select()
-        .single()
-
-      if (error) {
-        console.error('Error creating default profile:', error)
-        // Set local profile anyway for demo
-        setProfile(defaultProfile as ProfileData)
-      } else {
-        setProfile(data)
-      }
-    } catch (error) {
-      console.error('Error in createDefaultProfile:', error)
-      // Set local profile anyway for demo
-      setProfile(defaultProfile as ProfileData)
     }
   }
 
@@ -118,35 +89,29 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
     if (!user || !profile) return
 
     try {
-      const updatedProfile = {
-        ...profile,
-        ...updates,
-        updated_at: new Date().toISOString()
-      }
-
       const { data, error } = await supabase
         .from('profiles')
-        .update(updates)
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', user.id)
         .select()
         .single()
 
-      if (error) {
-        console.error('Error updating profile:', error)
-        // Update local state anyway for demo
-        setProfile(updatedProfile)
-      } else {
-        setProfile(data)
-      }
+      if (error) throw error
+      setProfile(data)
     } catch (error) {
-      console.error('Error in updateProfile:', error)
-      // Update local state anyway for demo
+      console.error('Error updating profile:', error)
+      
+      // Update local state anyway for demo purposes
       const updatedProfile = {
         ...profile,
         ...updates,
         updated_at: new Date().toISOString()
       }
       setProfile(updatedProfile)
+      throw error
     }
   }
 
@@ -160,7 +125,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
       setProfile(updatedProfile)
       
       // Also update in database
-      updateProfile({ profile_image_url: imageUrl })
+      updateProfile({ profile_image_url: imageUrl }).catch(console.error)
     }
   }
 

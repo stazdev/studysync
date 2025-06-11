@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { 
   BookOpen, 
   Users, 
@@ -13,9 +13,44 @@ import {
 import { Button } from '../components/ui/Button'
 import { StudyBuddyWidget } from '../components/study-buddy/StudyBuddyWidget'
 import { useNavigate } from 'react-router-dom'
+import { statsService } from '../services/statsService'
+import { uploadService } from '../services/uploadService'
+import { groupService } from '../services/groupService'
+import { useAuth } from '../contexts/AuthContext'
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const [userStats, setUserStats] = useState<any>({})
+  const [recentMaterials, setRecentMaterials] = useState<any[]>([])
+  const [userGroups, setUserGroups] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (user) {
+      loadDashboardData()
+    }
+  }, [user])
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true)
+      
+      const [stats, materials, groups] = await Promise.all([
+        statsService.getUserStats(),
+        uploadService.getUserMaterials(user!.id),
+        groupService.getUserGroups()
+      ])
+
+      setUserStats(stats)
+      setRecentMaterials(materials.slice(0, 3)) // Show only recent 3
+      setUserGroups(groups.slice(0, 2)) // Show only 2 active groups
+    } catch (error) {
+      console.error('Error loading dashboard data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const quickActions = [
     {
@@ -41,16 +76,25 @@ export const DashboardPage: React.FC = () => {
     },
   ]
 
-  const recentMaterials = [
-    { title: 'Calculus Chapter 5', type: 'PDF', date: '2 hours ago', progress: 85 },
-    { title: 'Biology Notes', type: 'Text', date: '1 day ago', progress: 60 },
-    { title: 'Chemistry Lab Report', type: 'PDF', date: '3 days ago', progress: 100 },
-  ]
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
+    
+    if (diffInHours < 1) return 'Less than an hour ago'
+    if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`
+    
+    const diffInDays = Math.floor(diffInHours / 24)
+    return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`
+  }
 
-  const activeGroups = [
-    { name: 'Advanced Mathematics', members: 12, nextSession: 'Today 3:00 PM' },
-    { name: 'Organic Chemistry', members: 8, nextSession: 'Tomorrow 10:00 AM' },
-  ]
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -93,7 +137,7 @@ export const DashboardPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-600 dark:text-gray-400 text-sm">Study Materials</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">24</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{userStats.materials_uploaded || 0}</p>
             </div>
             <BookOpen className="w-8 h-8 text-primary-600 dark:text-primary-400" />
           </div>
@@ -102,7 +146,7 @@ export const DashboardPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-600 dark:text-gray-400 text-sm">Study Groups</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">3</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{userStats.groups_joined || 0}</p>
             </div>
             <Users className="w-8 h-8 text-secondary-600 dark:text-secondary-400" />
           </div>
@@ -111,7 +155,7 @@ export const DashboardPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-600 dark:text-gray-400 text-sm">Quiz Score</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">87%</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{Math.round(userStats.average_quiz_score || 0)}%</p>
             </div>
             <TrendingUp className="w-8 h-8 text-accent-600 dark:text-accent-400" />
           </div>
@@ -119,8 +163,8 @@ export const DashboardPage: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 dark:text-gray-400 text-sm">Study Time</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">12h</p>
+              <p className="text-gray-600 dark:text-gray-400 text-sm">Sessions</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{userStats.sessions_attended || 0}</p>
             </div>
             <Clock className="w-8 h-8 text-primary-600 dark:text-primary-400" />
           </div>
@@ -133,26 +177,43 @@ export const DashboardPage: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Recent Study Materials</h3>
           <div className="space-y-4">
-            {recentMaterials.map((material, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <div className="flex items-center">
-                  <BookOpen className="w-5 h-5 text-gray-500 dark:text-gray-400 mr-3" />
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-white">{material.title}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{material.type} • {material.date}</p>
+            {recentMaterials.length > 0 ? (
+              recentMaterials.map((material, index) => (
+                <div key={material.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="flex items-center">
+                    <BookOpen className="w-5 h-5 text-gray-500 dark:text-gray-400 mr-3" />
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white">{material.title}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {material.file_type} • {formatTimeAgo(material.created_at)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-16 bg-gray-200 dark:bg-gray-600 rounded-full h-2 mr-3">
+                      <div 
+                        className="bg-primary-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: '100%' }}
+                      ></div>
+                    </div>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">100%</span>
                   </div>
                 </div>
-                <div className="flex items-center">
-                  <div className="w-16 bg-gray-200 dark:bg-gray-600 rounded-full h-2 mr-3">
-                    <div 
-                      className="bg-primary-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${material.progress}%` }}
-                    ></div>
-                  </div>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">{material.progress}%</span>
-                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <BookOpen className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
+                <p>No study materials yet</p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2"
+                  onClick={() => navigate('/upload')}
+                >
+                  Upload your first material
+                </Button>
               </div>
-            ))}
+            )}
           </div>
         </div>
 
@@ -160,21 +221,36 @@ export const DashboardPage: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Active Study Groups</h3>
           <div className="space-y-4">
-            {activeGroups.map((group, index) => (
-              <div key={index} className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium text-gray-900 dark:text-white">{group.name}</h4>
-                  <Star className="w-5 h-5 text-yellow-500" />
-                </div>
-                <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-                  <span>{group.members} members</span>
-                  <div className="flex items-center">
-                    <Calendar className="w-4 h-4 mr-1" />
-                    {group.nextSession}
+            {userGroups.length > 0 ? (
+              userGroups.map((group, index) => (
+                <div key={group.id} className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium text-gray-900 dark:text-white">{group.name}</h4>
+                    <Star className="w-5 h-5 text-yellow-500" />
+                  </div>
+                  <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+                    <span>{group.member_count} members</span>
+                    <div className="flex items-center">
+                      <Calendar className="w-4 h-4 mr-1" />
+                      <span>Active</span>
+                    </div>
                   </div>
                 </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <Users className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
+                <p>No study groups yet</p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2"
+                  onClick={() => navigate('/groups')}
+                >
+                  Join your first group
+                </Button>
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>
