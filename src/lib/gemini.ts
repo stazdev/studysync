@@ -71,6 +71,9 @@ export interface QuizQuestion {
   explanation?: string
   difficulty: 'easy' | 'medium' | 'hard'
   category: string
+  topic?: string
+  points?: number
+  type?: string
 }
 
 export class GeminiService {
@@ -256,48 +259,40 @@ Make sure the questions test understanding of key concepts and the answers are c
 
   async generateQuizQuestions(
     subject: string,
-    difficulty: 'easy' | 'medium' | 'hard',
+    difficulty: 'mixed' | 'easy' | 'medium' | 'hard',
     questionCount: number = 10,
     questionTypes: string[] = ['multiple-choice']
   ): Promise<QuizQuestion[]> {
     if (!this.isApiKeyConfigured() || !this.model) {
-      // Return mock quiz questions when API is not configured
-      return Array.from({ length: questionCount }, (_, i) => ({
-        id: `question-${i + 1}`,
-        question: `Sample ${difficulty} question ${i + 1} about ${subject}?`,
-        options: [
-          'Option A - This could be correct',
-          'Option B - This might be right',
-          'Option C - This is another possibility',
-          'Option D - This could also work'
-        ],
-        correctAnswer: Math.floor(Math.random() * 4),
-        explanation: `This is a sample explanation for question ${i + 1} about ${subject}.`,
-        difficulty,
-        category: subject
-      }))
+      // Return subject-specific mock questions when API is not configured
+      return this.generateSubjectSpecificMockQuestions(subject, difficulty, questionCount);
     }
 
     try {
-      const prompt = `Generate ${questionCount} ${difficulty} level quiz questions about ${subject}.
+      // Create a detailed prompt with subject-specific instructions
+      const prompt = `Generate ${questionCount} ${difficulty !== 'mixed' ? difficulty : ''} quiz questions about ${subject}.
+
+Each question must be specifically about ${subject} concepts, theories, or facts. Do not generate generic questions.
 
 Requirements:
-- Each question should be multiple choice with 4 options
+- Questions must test specific knowledge of ${subject}
+- Each question should have 4 answer options
 - Include the correct answer index (0-3)
-- Provide a brief explanation for each answer
-- Make questions appropriate for ${difficulty} difficulty level
-- Focus on ${subject} topic
+- Provide a brief explanation for the correct answer
+- Make questions appropriate for ${difficulty !== 'mixed' ? difficulty : 'varying'} difficulty level
+- Include a mix of factual, conceptual, and application questions
 
 Format your response as a JSON array:
 [
   {
-    "id": "question-1",
-    "question": "Question text here?",
+    "id": "q1",
+    "question": "Specific question about ${subject}?",
     "options": ["Option A", "Option B", "Option C", "Option D"],
     "correctAnswer": 0,
     "explanation": "Explanation of why this answer is correct",
-    "difficulty": "${difficulty}",
-    "category": "${subject}"
+    "difficulty": "medium",
+    "category": "${subject}",
+    "topic": "Specific topic within ${subject}"
   }
 ]
 
@@ -308,46 +303,279 @@ Ensure the JSON is valid and complete.`
       const text = response.text()
       
       try {
+        // Try to parse as JSON
         const questions = JSON.parse(text)
-        return Array.isArray(questions) ? questions : []
-      } catch (parseError) {
-        console.warn('Failed to parse quiz questions as JSON, creating fallback questions')
         
-        // Return fallback questions
-        return Array.from({ length: Math.min(questionCount, 5) }, (_, i) => ({
-          id: `question-${i + 1}`,
-          question: `What is an important concept in ${subject}?`,
-          options: [
-            'This is a key concept',
-            'This is another important idea',
-            'This relates to the main topic',
-            'This is a fundamental principle'
-          ],
-          correctAnswer: 0,
-          explanation: `This question tests understanding of ${subject} concepts.`,
-          difficulty,
-          category: subject
+        if (!Array.isArray(questions) || questions.length === 0) {
+          throw new Error('Invalid question format returned')
+        }
+        
+        // Validate and format each question
+        return questions.map((q, index) => ({
+          id: q.id || `q${index + 1}`,
+          question: q.question,
+          options: Array.isArray(q.options) && q.options.length === 4 ? q.options : 
+            ['Option A', 'Option B', 'Option C', 'Option D'],
+          correctAnswer: typeof q.correctAnswer === 'number' ? q.correctAnswer : 0,
+          explanation: q.explanation || `This is an important concept in ${subject}.`,
+          difficulty: q.difficulty || (difficulty === 'mixed' ? 'medium' : difficulty),
+          category: subject,
+          topic: q.topic || subject,
+          type: 'multiple-choice'
         }))
+      } catch (parseError) {
+        console.warn('Failed to parse quiz questions as JSON, creating subject-specific fallback questions')
+        return this.generateSubjectSpecificMockQuestions(subject, difficulty, questionCount);
       }
     } catch (error) {
       console.error('Error generating quiz questions:', error)
-      
-      // Return fallback questions
-      return Array.from({ length: Math.min(questionCount, 5) }, (_, i) => ({
-        id: `question-${i + 1}`,
-        question: `Sample question ${i + 1} about ${subject}`,
+      return this.generateSubjectSpecificMockQuestions(subject, difficulty, questionCount);
+    }
+  }
+
+  private generateSubjectSpecificMockQuestions(
+    subject: string, 
+    difficulty: 'mixed' | 'easy' | 'medium' | 'hard',
+    count: number
+  ): QuizQuestion[] {
+    // Map of subject-specific questions
+    const subjectQuestions: Record<string, QuizQuestion[]> = {
+      'Mathematics': [
+        {
+          id: 'math1',
+          question: 'What is the derivative of x²?',
+          options: ['2x', 'x', '2', 'x²'],
+          correctAnswer: 0,
+          explanation: 'Using the power rule: d/dx(x²) = 2x¹ = 2x',
+          difficulty: 'easy',
+          category: 'Mathematics',
+          topic: 'Calculus'
+        },
+        {
+          id: 'math2',
+          question: 'What is the value of π (pi) to two decimal places?',
+          options: ['3.14', '3.41', '3.12', '3.16'],
+          correctAnswer: 0,
+          explanation: 'Pi is approximately equal to 3.14159..., which rounds to 3.14',
+          difficulty: 'easy',
+          category: 'Mathematics',
+          topic: 'Constants'
+        },
+        {
+          id: 'math3',
+          question: 'What is the quadratic formula?',
+          options: [
+            'x = (-b ± √(b² - 4ac)) / 2a',
+            'x = (-b ± √(b² + 4ac)) / 2a',
+            'x = (b ± √(b² - 4ac)) / 2a',
+            'x = (-b ± √(b² - 4ac)) / a'
+          ],
+          correctAnswer: 0,
+          explanation: 'The quadratic formula for solving ax² + bx + c = 0 is x = (-b ± √(b² - 4ac)) / 2a',
+          difficulty: 'medium',
+          category: 'Mathematics',
+          topic: 'Algebra'
+        }
+      ],
+      'Physics': [
+        {
+          id: 'phys1',
+          question: 'What is Newton\'s Second Law of Motion?',
+          options: [
+            'F = ma',
+            'E = mc²',
+            'For every action, there is an equal and opposite reaction',
+            'Objects in motion stay in motion unless acted upon by an external force'
+          ],
+          correctAnswer: 0,
+          explanation: 'Newton\'s Second Law states that force equals mass times acceleration (F = ma)',
+          difficulty: 'medium',
+          category: 'Physics',
+          topic: 'Classical Mechanics'
+        },
+        {
+          id: 'phys2',
+          question: 'Which of these is a unit of force?',
+          options: ['Newton', 'Joule', 'Watt', 'Volt'],
+          correctAnswer: 0,
+          explanation: 'The Newton (N) is the SI unit of force, equal to 1 kg·m/s²',
+          difficulty: 'easy',
+          category: 'Physics',
+          topic: 'Units'
+        }
+      ],
+      'Chemistry': [
+        {
+          id: 'chem1',
+          question: 'What is the chemical symbol for gold?',
+          options: ['Au', 'Ag', 'Fe', 'Gd'],
+          correctAnswer: 0,
+          explanation: 'Au is the chemical symbol for gold, derived from the Latin word "aurum"',
+          difficulty: 'easy',
+          category: 'Chemistry',
+          topic: 'Periodic Table'
+        },
+        {
+          id: 'chem2',
+          question: 'What is the pH of a neutral solution at 25°C?',
+          options: ['7', '0', '14', '1'],
+          correctAnswer: 0,
+          explanation: 'A neutral solution has a pH of 7, with acidic solutions below 7 and basic solutions above 7',
+          difficulty: 'easy',
+          category: 'Chemistry',
+          topic: 'Acids and Bases'
+        }
+      ],
+      'Biology': [
+        {
+          id: 'bio1',
+          question: 'What is the powerhouse of the cell?',
+          options: ['Mitochondria', 'Nucleus', 'Endoplasmic reticulum', 'Golgi apparatus'],
+          correctAnswer: 0,
+          explanation: 'Mitochondria are responsible for cellular respiration and ATP production, earning them the nickname "powerhouse of the cell"',
+          difficulty: 'easy',
+          category: 'Biology',
+          topic: 'Cell Biology'
+        },
+        {
+          id: 'bio2',
+          question: 'Which of the following is NOT a nucleotide found in DNA?',
+          options: ['Uracil', 'Adenine', 'Guanine', 'Thymine'],
+          correctAnswer: 0,
+          explanation: 'DNA contains the nucleotides Adenine, Guanine, Cytosine, and Thymine. Uracil is found in RNA instead of Thymine.',
+          difficulty: 'medium',
+          category: 'Biology',
+          topic: 'Genetics'
+        },
+        {
+          id: 'bio3',
+          question: 'What process do plants use to convert light energy into chemical energy?',
+          options: ['Photosynthesis', 'Respiration', 'Fermentation', 'Digestion'],
+          correctAnswer: 0,
+          explanation: 'Photosynthesis is the process by which plants convert light energy into chemical energy stored in glucose',
+          difficulty: 'easy',
+          category: 'Biology',
+          topic: 'Plant Biology'
+        }
+      ],
+      'Computer Science': [
+        {
+          id: 'cs1',
+          question: 'What does CPU stand for?',
+          options: [
+            'Central Processing Unit',
+            'Computer Processing Unit',
+            'Central Program Unit',
+            'Central Processor Unit'
+          ],
+          correctAnswer: 0,
+          explanation: 'CPU stands for Central Processing Unit, which is the primary component of a computer that performs most of the processing',
+          difficulty: 'easy',
+          category: 'Computer Science',
+          topic: 'Hardware'
+        },
+        {
+          id: 'cs2',
+          question: 'Which of these is NOT a programming paradigm?',
+          options: [
+            'Quantum Programming',
+            'Object-Oriented Programming',
+            'Functional Programming',
+            'Procedural Programming'
+          ],
+          correctAnswer: 0,
+          explanation: 'While quantum computing exists, "Quantum Programming" is not a standard programming paradigm like OOP, functional, or procedural programming',
+          difficulty: 'medium',
+          category: 'Computer Science',
+          topic: 'Programming'
+        }
+      ],
+      'History': [
+        {
+          id: 'hist1',
+          question: 'In what year did World War II end?',
+          options: ['1945', '1939', '1918', '1941'],
+          correctAnswer: 0,
+          explanation: 'World War II ended in 1945 with the surrender of Japan following the atomic bombings of Hiroshima and Nagasaki',
+          difficulty: 'easy',
+          category: 'History',
+          topic: 'World War II'
+        },
+        {
+          id: 'hist2',
+          question: 'Who was the first President of the United States?',
+          options: ['George Washington', 'Thomas Jefferson', 'Abraham Lincoln', 'John Adams'],
+          correctAnswer: 0,
+          explanation: 'George Washington served as the first President of the United States from 1789 to 1797',
+          difficulty: 'easy',
+          category: 'History',
+          topic: 'American History'
+        }
+      ]
+    };
+    
+    // Default questions for subjects not in our map
+    const defaultQuestions: QuizQuestion[] = [
+      {
+        id: 'default1',
+        question: `What is an important concept in ${subject}?`,
         options: [
-          'Sample answer A',
-          'Sample answer B', 
-          'Sample answer C',
-          'Sample answer D'
+          'This is a key concept',
+          'This is another important idea',
+          'This relates to the main topic',
+          'This is a fundamental principle'
         ],
         correctAnswer: 0,
-        explanation: 'This is a sample question for demonstration purposes.',
-        difficulty,
-        category: subject
-      }))
+        explanation: `This question tests understanding of ${subject} concepts.`,
+        difficulty: 'medium',
+        category: subject,
+        topic: subject
+      },
+      {
+        id: 'default2',
+        question: `Which of the following best describes a principle in ${subject}?`,
+        options: [
+          'A fundamental theory that explains key phenomena',
+          'A minor concept with limited applications',
+          'An outdated idea no longer in use',
+          'A technique only used in specialized contexts'
+        ],
+        correctAnswer: 0,
+        explanation: `This tests knowledge of core principles in ${subject}.`,
+        difficulty: 'medium',
+        category: subject,
+        topic: subject
+      }
+    ];
+    
+    // Get subject-specific questions or use defaults
+    const availableQuestions = subjectQuestions[subject] || defaultQuestions;
+    
+    // If we don't have enough questions, pad with generated ones
+    if (availableQuestions.length < count) {
+      const additionalNeeded = count - availableQuestions.length;
+      
+      for (let i = 0; i < additionalNeeded; i++) {
+        availableQuestions.push({
+          id: `${subject.toLowerCase()}-gen-${i}`,
+          question: `What is another important concept in ${subject}?`,
+          options: [
+            `A key ${subject} principle`,
+            `A secondary ${subject} concept`,
+            `A related ${subject} theory`,
+            `A specialized ${subject} application`
+          ],
+          correctAnswer: 0,
+          explanation: `This tests knowledge of ${subject} fundamentals.`,
+          difficulty: difficulty === 'mixed' ? (i % 3 === 0 ? 'easy' : i % 3 === 1 ? 'medium' : 'hard') : difficulty as 'easy' | 'medium' | 'hard',
+          category: subject,
+          topic: `${subject} Fundamentals`
+        });
+      }
     }
+    
+    // Return the requested number of questions
+    return availableQuestions.slice(0, count);
   }
 
   async generateStudyBuddyResponse(
