@@ -63,6 +63,16 @@ export interface DocumentAnalysis {
   suggestedQuestions?: string[]
 }
 
+export interface QuizQuestion {
+  id: string
+  question: string
+  options: string[]
+  correctAnswer: number
+  explanation?: string
+  difficulty: 'easy' | 'medium' | 'hard'
+  category: string
+}
+
 export class GeminiService {
   private model = genAI ? genAI.getGenerativeModel({ model: 'gemini-1.5-flash' }) : null
   private apiKeyStatus = !!apiKey && apiKey !== 'your_gemini_api_key_here';
@@ -240,6 +250,102 @@ Make sure the questions test understanding of key concepts and the answers are c
         front: `Study Question ${i + 1}`,
         back: `This is important information from the document that you should review.`,
         category: 'General'
+      }))
+    }
+  }
+
+  async generateQuizQuestions(
+    subject: string,
+    difficulty: 'easy' | 'medium' | 'hard',
+    questionCount: number = 10,
+    questionTypes: string[] = ['multiple-choice']
+  ): Promise<QuizQuestion[]> {
+    if (!this.isApiKeyConfigured() || !this.model) {
+      // Return mock quiz questions when API is not configured
+      return Array.from({ length: questionCount }, (_, i) => ({
+        id: `question-${i + 1}`,
+        question: `Sample ${difficulty} question ${i + 1} about ${subject}?`,
+        options: [
+          'Option A - This could be correct',
+          'Option B - This might be right',
+          'Option C - This is another possibility',
+          'Option D - This could also work'
+        ],
+        correctAnswer: Math.floor(Math.random() * 4),
+        explanation: `This is a sample explanation for question ${i + 1} about ${subject}.`,
+        difficulty,
+        category: subject
+      }))
+    }
+
+    try {
+      const prompt = `Generate ${questionCount} ${difficulty} level quiz questions about ${subject}.
+
+Requirements:
+- Each question should be multiple choice with 4 options
+- Include the correct answer index (0-3)
+- Provide a brief explanation for each answer
+- Make questions appropriate for ${difficulty} difficulty level
+- Focus on ${subject} topic
+
+Format your response as a JSON array:
+[
+  {
+    "id": "question-1",
+    "question": "Question text here?",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correctAnswer": 0,
+    "explanation": "Explanation of why this answer is correct",
+    "difficulty": "${difficulty}",
+    "category": "${subject}"
+  }
+]
+
+Ensure the JSON is valid and complete.`
+
+      const result = await this.model.generateContent(prompt)
+      const response = await result.response
+      const text = response.text()
+      
+      try {
+        const questions = JSON.parse(text)
+        return Array.isArray(questions) ? questions : []
+      } catch (parseError) {
+        console.warn('Failed to parse quiz questions as JSON, creating fallback questions')
+        
+        // Return fallback questions
+        return Array.from({ length: Math.min(questionCount, 5) }, (_, i) => ({
+          id: `question-${i + 1}`,
+          question: `What is an important concept in ${subject}?`,
+          options: [
+            'This is a key concept',
+            'This is another important idea',
+            'This relates to the main topic',
+            'This is a fundamental principle'
+          ],
+          correctAnswer: 0,
+          explanation: `This question tests understanding of ${subject} concepts.`,
+          difficulty,
+          category: subject
+        }))
+      }
+    } catch (error) {
+      console.error('Error generating quiz questions:', error)
+      
+      // Return fallback questions
+      return Array.from({ length: Math.min(questionCount, 5) }, (_, i) => ({
+        id: `question-${i + 1}`,
+        question: `Sample question ${i + 1} about ${subject}`,
+        options: [
+          'Sample answer A',
+          'Sample answer B', 
+          'Sample answer C',
+          'Sample answer D'
+        ],
+        correctAnswer: 0,
+        explanation: 'This is a sample question for demonstration purposes.',
+        difficulty,
+        category: subject
       }))
     }
   }
