@@ -245,8 +245,8 @@ export const UploadPage: React.FC = () => {
       
       success('File processed successfully', `${file.name} has been analyzed and is ready for study`)
       
-    } catch (error) {
-      console.error('Error processing file:', error)
+    } catch (err) {
+      console.error('Error processing file:', err)
       setUploadedFiles(prev => prev.map(f => 
         f.id === fileId ? { 
           ...f, 
