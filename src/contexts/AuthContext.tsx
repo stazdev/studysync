@@ -1,95 +1,100 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
-import { User, Session } from '@supabase/supabase-js'
-import { supabase } from '../lib/supabase'
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import api from '../lib/api';
+
+interface User {
+  _id: string;
+  email: string;
+  fullName: string;
+  avatarUrl?: string;
+  role: string;
+}
 
 interface AuthContextType {
-  user: User | null
-  session: Session | null
-  loading: boolean
-  signUp: (email: string, password: string, username: string) => Promise<any>
-  signIn: (email: string, password: string) => Promise<any>
-  signOut: () => Promise<void>
+  user: User | null;
+  loading: boolean;
+  signUp: (email: string, password: string, username: string) => Promise<any>;
+  signIn: (email: string, password: string) => Promise<any>;
+  signOut: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
-  const context = useContext(AuthContext)
+  const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
+    throw new Error('useAuth must be used within an AuthProvider');
   }
-  return context
-}
+  return context;
+};
 
 interface AuthProviderProps {
-  children: React.ReactNode
+  children: React.ReactNode;
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null)
-  const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+    const checkLoggedIn = async () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          const { data } = await api.get('/auth/profile');
+          setUser(data);
+        } catch (error) {
+          console.error('Not logged in', error);
+          localStorage.removeItem('token');
+          setUser(null);
+        }
+      }
+      setLoading(false);
+    };
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+    checkLoggedIn();
+  }, []);
 
-    return () => subscription.unsubscribe()
-  }, [])
-
-  const signUp = async (email: string, password: string, username: string) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          username,
-        },
-      },
-    })
-
-    if (error) throw error
-
-    // Profile will be created automatically via database trigger
-    return data
-  }
+  const signUp = async (email: string, password: string, fullName: string) => {
+    try {
+      const { data } = await api.post('/auth/register', {
+        email,
+        password,
+        fullName,
+      });
+      localStorage.setItem('token', data.token);
+      setUser(data);
+      return data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Signup failed');
+    }
+  };
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    try {
+      const { data } = await api.post('/auth/login', {
+        email,
+        password,
+      });
+      localStorage.setItem('token', data.token);
+      setUser(data);
+      return data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Login failed');
+    }
+  };
 
-    if (error) throw error
-    return data
-  }
-
-  const signOut = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) throw error
-  }
+  const signOut = () => {
+    localStorage.removeItem('token');
+    setUser(null);
+  };
 
   const value = {
     user,
-    session,
     loading,
     signUp,
     signIn,
     signOut,
-  }
+  };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};

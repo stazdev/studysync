@@ -1,68 +1,37 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { 
-  MessageSquare, 
   Send, 
-  Smile, 
   Paperclip, 
-  Image, 
+  ImageIcon,
+  VideoIcon,
   File, 
   Phone, 
   Video, 
   Info, 
   Search, 
-  MoreVertical, 
   ArrowLeft,
-  Users,
-  Settings,
-  Bell,
-  BellOff,
-  Pin,
-  Star,
-  Reply,
-  Edit3,
-  Trash2,
-  Copy,
-  Forward,
-  Download,
-  Eye,
-  EyeOff,
   Crown,
   Shield,
-  User,
   Clock,
   CheckCircle,
   Check,
-  AlertCircle,
+  Reply,
+  Edit3,
+  Trash2,
   Plus,
-  Hash,
-  AtSign,
-  Mic,
-  MicOff,
-  Camera,
-  CameraOff,
-  Share2,
-  BookOpen,
-  Brain,
-  Target,
-  Zap,
-  Award,
-  TrendingUp,
-  Calendar,
-  Link,
-  ExternalLink,
-  FileText,
-  ImageIcon,
-  VideoIcon,
+  X,
   Music,
-  Archive,
-  X
+  FileText,
+  Download
 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
+import { chatService, ChatMessageWithProfile } from '../services/chatService'
 
+// ... interfaces ...
 interface ChatMessage {
   id: string
   userId: string
@@ -109,23 +78,19 @@ export const ChatPage: React.FC = () => {
   const { groupId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { success, error, info } = useToast()
+  const { success, info, error } = useToast()
   
   // Chat state
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [newMessage, setNewMessage] = useState('')
-  const [isTyping, setIsTyping] = useState(false)
-  const [typingUsers, setTypingUsers] = useState<string[]>([])
+  const [typingUsers] = useState<string[]>([]) // Placeholder for typing status
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null)
   const [editingMessage, setEditingMessage] = useState<string | null>(null)
   
   // UI state
   const [showGroupInfo, setShowGroupInfo] = useState(false)
-  const [showMembers, setShowMembers] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set())
-  const [isRecording, setIsRecording] = useState(false)
   
   // Group data
   const [groupInfo, setGroupInfo] = useState<GroupInfo | null>(null)
@@ -136,212 +101,112 @@ export const ChatPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messageInputRef = useRef<HTMLTextAreaElement>(null)
 
-  // Mock data
+  // Load data
   useEffect(() => {
+    if (!groupId || !user) return;
+
+    // Join socket room
+    chatService.joinGroup(groupId);
+
+    // Load history messages
+    const loadMessages = async () => {
+      try {
+        const history = await chatService.getMessages(groupId);
+        const formattedMessages = history.map(msg => ({
+            id: msg._id,
+            userId: msg.sender._id,
+            userName: msg.sender.fullName,
+            userAvatar: msg.sender.avatarUrl || '👤',
+            message: msg.content,
+            timestamp: new Date(msg.createdAt),
+            type: 'text' as const,
+            status: 'read' as const
+        }));
+        setMessages(formattedMessages);
+      } catch (err) {
+        console.error("Failed to load messages", err);
+        error("Failed to load chat history");
+      }
+    };
+    loadMessages();
+
+    // Load mock group info
     const mockGroupInfo: GroupInfo = {
-      id: groupId || '1',
-      name: 'Advanced Calculus Study Circle',
-      description: 'Deep dive into calculus concepts with problem-solving sessions and peer teaching.',
-      avatar: '📐',
-      memberCount: 15,
-      createdAt: '2024-01-15',
+      id: groupId,
+      name: 'Study Group',
+      description: 'Collaborative learning',
+      avatar: '📚',
+      memberCount: 5,
+      createdAt: new Date().toISOString(),
       isPrivate: false,
       settings: {
         allowFileSharing: true,
         allowVoiceMessages: true,
         muteNotifications: false,
-        pinned: true
+        pinned: false
       }
     }
+    setGroupInfo(mockGroupInfo);
 
+    // Mock members
     const mockMembers: GroupMember[] = [
-      {
-        id: '1',
-        name: 'Dr. Sarah Chen',
-        avatar: '👩‍🏫',
-        role: 'owner',
-        status: 'online'
-      },
-      {
-        id: '2',
-        name: 'Alex Rodriguez',
-        avatar: '👨‍🎓',
-        role: 'moderator',
-        status: 'online'
-      },
-      {
-        id: '3',
-        name: 'Emma Wilson',
-        avatar: '👩‍💼',
-        role: 'member',
-        status: 'away',
-        lastSeen: '5 minutes ago'
-      },
-      {
-        id: '4',
-        name: 'Mike Johnson',
-        avatar: '👨‍💻',
-        role: 'member',
-        status: 'offline',
-        lastSeen: '2 hours ago'
-      },
-      {
-        id: user?.id || '5',
-        name: user?.user_metadata?.username || 'You',
-        avatar: '👤',
-        role: 'member',
-        status: 'online'
-      }
-    ]
-
-    const mockMessages: ChatMessage[] = [
-      {
-        id: '1',
-        userId: '1',
-        userName: 'Dr. Sarah Chen',
-        userAvatar: '👩‍🏫',
-        message: 'Welcome to our study group chat! Feel free to ask questions and share resources.',
-        timestamp: new Date(Date.now() - 86400000),
-        type: 'announcement',
-        status: 'read'
-      },
-      {
-        id: '2',
-        userId: '2',
-        userName: 'Alex Rodriguez',
-        userAvatar: '👨‍🎓',
-        message: 'Thanks for setting this up! I have some practice problems I can share.',
-        timestamp: new Date(Date.now() - 82800000),
-        type: 'text',
-        status: 'read'
-      },
-      {
-        id: '3',
-        userId: '3',
-        userName: 'Emma Wilson',
-        userAvatar: '👩‍💼',
-        message: 'That would be great! I\'m struggling with integration by parts.',
-        timestamp: new Date(Date.now() - 79200000),
-        type: 'text',
-        status: 'read'
-      },
-      {
-        id: '4',
-        userId: '2',
-        userName: 'Alex Rodriguez',
-        userAvatar: '👨‍🎓',
-        message: 'Integration Practice Problems.pdf',
-        timestamp: new Date(Date.now() - 75600000),
-        type: 'file',
-        fileName: 'Integration Practice Problems.pdf',
-        fileSize: 2048576,
-        status: 'read'
-      },
-      {
-        id: '5',
-        userId: '1',
-        userName: 'Dr. Sarah Chen',
-        userAvatar: '👩‍🏫',
-        message: 'Excellent! These problems cover all the key techniques we\'ll need for the exam.',
-        timestamp: new Date(Date.now() - 72000000),
-        type: 'text',
-        replyTo: '4',
-        status: 'read'
-      },
-      {
-        id: '6',
-        userId: '4',
-        userName: 'Mike Johnson',
-        userAvatar: '👨‍💻',
-        message: 'Can someone explain the difference between u-substitution and integration by parts?',
-        timestamp: new Date(Date.now() - 3600000),
-        type: 'text',
-        status: 'read'
-      },
-      {
-        id: '7',
-        userId: '1',
-        userName: 'Dr. Sarah Chen',
-        userAvatar: '👩‍🏫',
-        message: 'Great question! U-substitution is used when you can identify a function and its derivative, while integration by parts follows the formula ∫u dv = uv - ∫v du.',
-        timestamp: new Date(Date.now() - 3300000),
-        type: 'text',
-        replyTo: '6',
-        status: 'read'
-      },
-      {
-        id: '8',
-        userId: '3',
-        userName: 'Emma Wilson',
-        userAvatar: '👩‍💼',
-        message: 'That makes sense! Do you have any tips for choosing u and dv?',
-        timestamp: new Date(Date.now() - 1800000),
-        type: 'text',
-        status: 'read'
-      }
-    ]
-
-    setGroupInfo(mockGroupInfo)
+       {
+         id: user?._id || '5',
+         name: user?.fullName || 'You',
+         avatar: user?.avatarUrl || '👤',
+         role: 'member',
+         status: 'online'
+       }
+    ];
     setMembers(mockMembers)
-    setMessages(mockMessages)
-  }, [groupId, user])
+
+    // Subscribe to messages
+    chatService.subscribeToMessages((msg: ChatMessageWithProfile) => {
+        const newMsg: ChatMessage = {
+            id: msg._id,
+            userId: msg.sender._id,
+            userName: msg.sender.fullName,
+            userAvatar: msg.sender.avatarUrl || '👤',
+            message: msg.content,
+            timestamp: new Date(msg.createdAt),
+            type: 'text',
+            status: 'read'
+        };
+        setMessages(prev => {
+             // Avoid duplicates if necessary
+             if (prev.find(m => m.id === newMsg.id)) return prev;
+             return [...prev, newMsg];
+        });
+    });
+
+    return () => {
+        chatService.leaveGroup(groupId);
+        chatService.unsubscribeFromMessages();
+    }
+  }, [groupId, user, error]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const sendMessage = () => {
-    if (!newMessage.trim()) return
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !groupId || !user) return
 
-    const message: ChatMessage = {
-      id: Date.now().toString(),
-      userId: user?.id || 'user',
-      userName: user?.user_metadata?.username || 'You',
-      userAvatar: '👤',
-      message: newMessage,
-      timestamp: new Date(),
-      type: 'text',
-      replyTo: replyingTo?.id,
-      status: 'sending'
+    try {
+        await chatService.sendMessage(groupId, newMessage, user._id);
+        setNewMessage('')
+        setReplyingTo(null)
+    } catch (err) {
+        console.error(err);
+        error("Failed to send message", "Please try again");
     }
-
-    setMessages(prev => [...prev, message])
-    setNewMessage('')
-    setReplyingTo(null)
-
-    // Simulate message delivery
-    setTimeout(() => {
-      setMessages(prev => prev.map(msg => 
-        msg.id === message.id ? { ...msg, status: 'sent' } : msg
-      ))
-    }, 500)
-
-    setTimeout(() => {
-      setMessages(prev => prev.map(msg => 
-        msg.id === message.id ? { ...msg, status: 'delivered' } : msg
-      ))
-    }, 1000)
   }
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
-
-    const message: ChatMessage = {
-      id: Date.now().toString(),
-      userId: user?.id || 'user',
-      userName: user?.user_metadata?.username || 'You',
-      userAvatar: '👤',
-      message: file.name,
-      timestamp: new Date(),
-      type: file.type.startsWith('image/') ? 'image' : 'file',
-      fileName: file.name,
-      fileSize: file.size,
-      status: 'sending'
-    }
-
-    setMessages(prev => [...prev, message])
-    success('File uploaded', `${file.name} has been shared`)
+    // Not implemented in backend for chat yet
+    success('File upload simulated', `${file.name}`)
   }
 
   const formatFileSize = (bytes: number) => {
@@ -504,7 +369,7 @@ export const ChatPage: React.FC = () => {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {messages.map((message) => {
-            const isOwn = message.userId === user?.id
+            const isOwn = message.userId === user?._id // use _id from mongo
             const replyMessage = message.replyTo ? messages.find(m => m.id === message.replyTo) : null
             const StatusIcon = getStatusIcon(message.status)
 

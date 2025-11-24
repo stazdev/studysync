@@ -1,141 +1,78 @@
-import { supabase } from '../lib/supabase'
-import type { Database } from '../lib/supabase'
+import io from 'socket.io-client';
+import api from '../lib/api';
 
-type ChatMessage = Database['public']['Tables']['chat_messages']['Row']
-type ChatMessageInsert = Database['public']['Tables']['chat_messages']['Insert']
+const socket = io('http://localhost:5000');
 
-export interface ChatMessageWithProfile extends ChatMessage {
-  profiles: {
-    username: string
-    profile_image_url: string | null
-  }
+export interface ChatMessageWithProfile {
+  _id: string;
+  content: string;
+  sender: {
+    _id: string;
+    fullName: string;
+    avatarUrl?: string;
+  };
+  createdAt: string;
+  groupId: string;
 }
 
 export const chatService = {
   async getMessages(groupId: string): Promise<ChatMessageWithProfile[]> {
     try {
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select(`
-          *,
-          profiles:user_id (
-            username,
-            profile_image_url
-          )
-        `)
-        .eq('group_id', groupId)
-        .order('created_at', { ascending: true })
-
-      if (error) throw error
-      return data as ChatMessageWithProfile[]
+      const { data } = await api.get(`/chat/${groupId}`);
+      return data;
     } catch (error) {
-      console.error('Error fetching messages:', error)
-      return []
+      console.error('Error fetching messages:', error);
+      return [];
     }
   },
 
   async sendMessage(
     groupId: string, 
     message: string, 
-    messageType: string = 'text',
-    fileUrl?: string,
-    fileName?: string,
-    replyTo?: string
-  ): Promise<ChatMessage> {
-    try {
-      const { data: user } = await supabase.auth.getUser()
-      if (!user.user) throw new Error('User not authenticated')
-
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .insert({
-          group_id: groupId,
-          user_id: user.user.id,
-          message,
-          message_type: messageType,
-          file_url: fileUrl,
-          file_name: fileName,
-          reply_to: replyTo
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-      return data
-    } catch (error) {
-      console.error('Error sending message:', error)
-      throw error
-    }
+    userId: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _messageType: string = 'text',
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _fileUrl?: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _fileName?: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _replyTo?: string
+  ): Promise<void> {
+    // We emit socket event for real-time
+    socket.emit('send_message', {
+        groupId,
+        content: message,
+        senderId: userId
+    });
+    // Note: The server saves the message to DB when it receives the socket event
   },
 
-  async editMessage(messageId: string, newMessage: string): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('chat_messages')
-        .update({ 
-          message: newMessage, 
-          is_edited: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', messageId)
-
-      if (error) throw error
-    } catch (error) {
-      console.error('Error editing message:', error)
-      throw error
-    }
+  joinGroup(groupId: string) {
+      socket.emit('join_group', groupId);
   },
 
-  async deleteMessage(messageId: string): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('chat_messages')
-        .delete()
-        .eq('id', messageId)
-
-      if (error) throw error
-    } catch (error) {
-      console.error('Error deleting message:', error)
-      throw error
-    }
+  leaveGroup(groupId: string) {
+      socket.emit('leave_group', groupId);
   },
 
-  subscribeToMessages(groupId: string, callback: (message: ChatMessageWithProfile) => void) {
-    return supabase
-      .channel(`chat:${groupId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'chat_messages',
-          filter: `group_id=eq.${groupId}`
-        },
-        async (payload) => {
-          // Fetch the complete message with profile data
-          const { data } = await supabase
-            .from('chat_messages')
-            .select(`
-              *,
-              profiles:user_id (
-                username,
-                profile_image_url
-              )
-            `)
-            .eq('id', payload.new.id)
-            .single()
-
-          if (data) {
-            callback(data as ChatMessageWithProfile)
-          }
-        }
-      )
-      .subscribe()
+  subscribeToMessages(callback: (message: ChatMessageWithProfile) => void) {
+    socket.on('receive_message', (message: any) => {
+        callback(message);
+    });
   },
 
-  unsubscribeFromMessages(subscription: any) {
-    if (subscription) {
-      supabase.removeChannel(subscription)
-    }
+  unsubscribeFromMessages() {
+    socket.off('receive_message');
+  },
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async editMessage(_messageId: string, _newMessage: string): Promise<void> {
+     // Placeholder
+  },
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async deleteMessage(_messageId: string): Promise<void> {
+     // Placeholder
   }
-}
+};

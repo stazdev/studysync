@@ -256,9 +256,9 @@ export const DashboardLayout: React.FC = () => {
   const displayNotifications = showAllNotifications ? notifications : notifications.slice(0, 5)
 
   // Get user display info
-  const userDisplayName = profile?.full_name || profile?.username || user?.user_metadata?.username || 'User'
+  const userDisplayName = profile?.full_name || profile?.username || user?.fullName || 'User'
   const userInitials = userDisplayName[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'
-  const userProfileImage = profile?.profile_image_url
+  const userProfileImage = profile?.profile_image_url || user?.avatarUrl
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">

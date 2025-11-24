@@ -13,96 +13,60 @@ StudySync is a modern web application that combines AI-powered study assistance 
 
 ## Quick Setup
 
-### 1. Environment Configuration
+### 1. Backend Setup
 
-Copy the `.env.example` file to `.env` and fill in your credentials:
+Navigate to the `backend` directory and install dependencies:
 
 ```bash
-cp .env.example .env
+cd backend
+npm install
 ```
 
-Required environment variables:
-- `VITE_SUPABASE_URL`: Your Supabase project URL
-- `VITE_SUPABASE_ANON_KEY`: Your Supabase anonymous key
-- `VITE_GEMINI_API_KEY`: Your Google Gemini API key
+Create a `.env` file in `backend/` with the following credentials:
 
-### 2. Database Setup
+```
+PORT=5000
+MONGODB_URI=mongodb://localhost:27017/studysync
+JWT_SECRET=your_secure_secret_key
+FRONTEND_URL=http://localhost:5173
+GEMINI_API_KEY=your_gemini_api_key
+```
 
-**Important**: You need to run the database migration to set up all required tables and functions.
-
-1. Go to your Supabase Dashboard
-2. Navigate to the SQL Editor
-3. Copy and paste the contents of `supabase/migrations/20250611170600_fix_missing_tables.sql`
-4. Run the migration
-
-This will create all necessary:
-- Tables (profiles, study_groups, notifications, etc.)
-- Functions (get_user_stats, mark_notification_read, etc.)
-- Row Level Security policies
-- Storage buckets and policies
-
-### 3. API Keys Setup
-
-#### Supabase
-1. Create a new project at [supabase.com](https://supabase.com)
-2. Go to Settings > API
-3. Copy your Project URL and anon/public key
-
-#### Google Gemini API
-1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Create a new API key
-3. Add it to your `.env` file
-
-### 4. Install and Run
+Start the backend server:
 
 ```bash
-npm install
 npm run dev
 ```
 
-## Database Schema
+### 2. Frontend Setup
 
-The application uses the following main tables:
-- `profiles` - User profile information
-- `study_groups` - Study group data
-- `group_members` - Group membership relationships
-- `study_materials` - Uploaded content and analysis
-- `notifications` - User notifications
-- `quizzes` - Quiz definitions and attempts
-- `chat_messages` - Group chat messages
-
-## Troubleshooting
-
-### Common Issues
-
-1. **"Function not found" errors**: Make sure you've run the database migration
-2. **"Table does not exist" errors**: Run the migration script in Supabase SQL Editor
-3. **Gemini API 403 errors**: Check that your API key is valid and properly set
-4. **Authentication issues**: Verify your Supabase credentials
-
-### Database Migration
-
-If you're getting database-related errors, run this SQL in your Supabase SQL Editor:
-
-```sql
--- Copy the entire contents of supabase/migrations/20250611170600_fix_missing_tables.sql
-```
-
-## Development
+Install dependencies:
 
 ```bash
-# Install dependencies
 npm install
-
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
 ```
+
+Create a `.env` file in the root directory:
+
+```
+VITE_GEMINI_API_KEY=your_gemini_api_key_here # Optional if AI is fully handled by backend
+```
+
+Start the frontend development server:
+
+```bash
+npm run dev
+```
+
+### 3. Database Setup
+
+Ensure you have MongoDB running locally or provide a valid MongoDB Atlas URI in `backend/.env`.
+
+## Technologies Used
+
+- **Frontend**: React, TypeScript, Tailwind CSS, Vite
+- **Backend**: Node.js, Express.js, Mongoose (MongoDB), Socket.io
+- **AI**: Google Gemini API
 
 ## Contributing
 
