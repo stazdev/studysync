@@ -149,7 +149,7 @@ export const ProfilePage: React.FC = () => {
     { type: 'session', description: 'Attended live study session', time: '3 days ago' }
   ]
 
-  const userDisplayName = profile.full_name || profile.username || 'User'
+  const userDisplayName = profile.full_name || profile.username || user?.fullName || 'User'
   const userInitials = userDisplayName[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'
 
   return (
@@ -162,14 +162,14 @@ export const ProfilePage: React.FC = () => {
             <div className="flex items-center space-x-6">
               <div className="relative">
                 <ProfileImageUpload
-                  currentImageUrl={profile.profile_image_url}
+                  currentImageUrl={profile.profile_image_url || user?.avatarUrl}
                   onImageUpdate={handleImageUpdate}
                   size="xl"
                 />
               </div>
               <div>
                 <h1 className="text-3xl font-bold mb-2">{userDisplayName}</h1>
-                <p className="text-primary-100 mb-2">@{profile.username}</p>
+                <p className="text-primary-100 mb-2">@{profile.username || user?.email?.split('@')[0]}</p>
                 <div className="flex items-center space-x-4 text-primary-100">
                   <div className="flex items-center space-x-1">
                     <Mail className="w-4 h-4" />

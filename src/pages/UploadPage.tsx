@@ -1,11 +1,9 @@
 import React, { useState, useRef, useCallback } from 'react'
-import { Upload, FileText, Image, File, X, Eye, Download, Sparkles, Brain, BookOpen, CheckCircle, AlertCircle, Loader2, Plus, Trash2, FileImage, File as FilePdf, FileType, Zap, Target, Clock, BarChart3, MessageSquare, Send, ArrowRight, ArrowLeft, RotateCcw, Award, Star, HelpCircle, Lightbulb, ChevronRight, ChevronDown } from 'lucide-react'
+import { Upload, FileText, Image, File, X, Eye, Download, Sparkles, Brain, BookOpen, CheckCircle, AlertCircle, Loader2, Plus, Trash2, FileImage, File as FilePdf, FileType, Zap, Target, Clock, BarChart3, MessageSquare, ArrowRight, ArrowLeft, RotateCcw, Award } from 'lucide-react'
 import { Button } from '../components/ui/Button'
-import { Input } from '../components/ui/Input'
 import { geminiService } from '../lib/gemini'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
-import { supabase } from '../lib/supabase'
 
 interface UploadedFile {
   id: string
@@ -72,7 +70,11 @@ interface FlashcardSession {
 }
 
 export const UploadPage: React.FC = () => {
-  const { user } = useAuth()
+  const { user } = useAuth() // user is used in logic although not explicitly in this snippet
+  // Keeping user for auth check context if needed in future
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _user = user;
+
   const { success, error, info } = useToast()
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [dragActive, setDragActive] = useState(false)

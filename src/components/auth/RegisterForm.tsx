@@ -38,6 +38,7 @@ export const RegisterForm: React.FC = () => {
       await signUp(email, password, username)
       navigate('/dashboard')
     } catch (err: any) {
+      console.error(err);
       setError(err.message || 'Failed to create account')
     } finally {
       setLoading(false)
