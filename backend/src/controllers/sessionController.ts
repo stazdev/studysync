@@ -88,7 +88,7 @@ export const leaveSession = async (req: any, res: Response) => {
 
         session.participants = session.participants.filter(
             (p: any) => p.userId.toString() !== req.user._id.toString()
-        );
+        ) as any;
         await session.save();
         res.json({ message: 'Left session' });
     } catch (error: any) {

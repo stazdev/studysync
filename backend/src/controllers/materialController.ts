@@ -12,7 +12,8 @@ export const uploadMaterial = async (req: any, res: Response) => {
     let fileUrl = '';
     if (req.file) {
       // Construct URL for the uploaded file
-      fileUrl = `${process.env.FRONTEND_URL?.replace('5173', '5000')}/uploads/${req.file.filename}`;
+      const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
+      fileUrl = `${backendUrl}/uploads/${req.file.filename}`;
     }
 
     const material = await StudyMaterial.create({

@@ -50,7 +50,8 @@ export const uploadAvatar = async (req: any, res: Response) => {
             return;
         }
 
-        const fileUrl = `${process.env.FRONTEND_URL?.replace('5173', '5000')}/uploads/${req.file.filename}`;
+        const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
+        const fileUrl = `${backendUrl}/uploads/${req.file.filename}`;
 
         const user = await User.findById(req.user._id);
         if (user) {
